@@ -65,6 +65,10 @@ button.pill:hover{background:#26306a}
 .card{border:.3cqw solid #6a5a3a;background:#2a2316;border-radius:.4cqw;padding:.6cqw 1.2cqw;margin-bottom:.7cqw}
 .card.lv3{border-color:var(--gold)}.card .lv{float:right;color:#ffcf6a}
 .empty{opacity:.6}
+.icard{display:flex;gap:1.2cqw;background:#1b2350;border:.25cqw solid #4a5a9a;border-radius:.4cqw;padding:.7cqw 1.2cqw;margin-bottom:.7cqw}
+.iicon{font-size:3cqw;line-height:1}
+.icard b{color:var(--gold);font-size:1.7cqw}.icard p{margin:.3cqw 0 0;font-size:1.45cqw;line-height:1.5;color:#e8e4f2}
+.ion{font-style:normal;font-size:1.2cqw;background:#3a2c12;color:var(--gold);border:.15cqw solid var(--gold);border-radius:.3cqw;padding:0 .6cqw;margin-left:.8cqw}
 .stats{display:grid;grid-template-columns:1fr 1fr;gap:.3cqw 3cqw}
 .stat{display:flex;justify-content:space-between;max-width:30cqw}.stat b{color:var(--gold);letter-spacing:.2cqw}.stat b.sus{color:#ff8a8a}
 .rel{display:grid;grid-template-columns:8cqw 6cqw 8cqw 1fr;gap:1cqw;padding:.2cqw 0;border-bottom:.15cqw solid #ffffff12}
@@ -191,6 +195,7 @@ button.pill:hover{background:#26306a}
     <button class="pill gold" id="btnGoal">🎯 目標</button>
     <button class="pill" id="btnPhone">📱<i id="phoneBadge"></i></button>
     <button class="pill" id="btnStatus">👤 狀態</button>
+    <button class="pill" id="btnItems">🎒 道具</button>
     <button class="pill" id="btnCards">📁 把柄</button>
     <button class="pill" id="btnMap">🗺 地圖</button>
   </div>
@@ -207,6 +212,7 @@ button.pill:hover{background:#26306a}
   <div class="panel" id="mapPanel"><h2>萬家豪宅</h2><button class="pill close" data-close>✕</button><div class="body"></div></div>
   <div class="panel" id="cardPanel"><h2>📁 把柄筆記</h2><button class="pill close" data-close>✕</button><div class="body"></div></div>
   <div class="panel" id="goalPanel"><h2>🎯 目標</h2><button class="pill close" data-close>✕</button><div class="body"></div></div>
+  <div class="panel" id="itemPanel"><h2>🎒 道具</h2><button class="pill close" data-close>✕</button><div class="body"></div></div>
   <div class="panel" id="statusPanel"><h2>👤 狀態</h2><button class="pill close" data-close>✕</button><div class="body"></div></div>
 
   <div id="banner"></div>

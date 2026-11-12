@@ -164,7 +164,7 @@ function resolve(S, cmd, t, extra, out) {
         else if (t === 'qiu') ctx.gainSid = gossip(S, t, 2, notes);
         else if (t === 'uncle' && S.flags.junjieTruth && !S.items.sabotage) {
           S.items.sabotage = true; ctx.sabotage = true;
-          notes.push({ sys: 1, t: `📄 得到：${W.ITEMS.sabotage}` });
+          notes.push({ sys: 1, t: W.got('sabotage') });
         }
         else {
           const sid = T.secrets.find(s => lvl(S, s) < 2);
@@ -238,12 +238,12 @@ function onBond(S, t, stage, notes) {
   if (t === 'kui' && stage >= 3) unlockGoal(S, 'escape');
   if ((t === 'qiu' || t === 'qianqian') && stage >= 2) unlockGoal(S, 'legal');
   if (stage < 3) return;
-  if (t === 'kui') { setMotive(S, 'kui', '信任你'); S.items.necklace = true; notes.push({ sys: 1, t: `🔑 得到：${W.ITEMS.necklace}` }); }
+  if (t === 'kui') { setMotive(S, 'kui', '信任你'); S.items.necklace = true; notes.push({ sys: 1, t: W.got('necklace') }); }
   if (t === 'qiu') {
-    if (S.stats.moral >= 3 && S.lies === 0) { setMotive(S, 'qiu', '託付'); S.items.will2 = true; notes.push({ sys: 1, t: `📜 得到：${W.ITEMS.will2}` }); }
+    if (S.stats.moral >= 3 && S.lies === 0) { setMotive(S, 'qiu', '託付'); S.items.will2 = true; notes.push({ sys: 1, t: W.got('will2') }); }
     else S.flags.qiuWaiting = true;
   }
-  if (t === 'qianqian') { S.items.video = true; notes.push({ sys: 1, t: `📱 得到：${W.ITEMS.video}` }); }
+  if (t === 'qianqian') { S.items.video = true; notes.push({ sys: 1, t: W.got('video') }); }
   if (t === 'uncle') { S.flags.uncleTruth = true; unlockGoal(S, 'company'); }
   if (t === 'ergu') { S.flags.erguTruth = true; unlockGoal(S, 'daughter'); }
   if (t === 'junjie') { S.flags.junjieTruth = true; unlockGoal(S, 'brothers'); }
@@ -308,15 +308,15 @@ function persuade(S, opt) {
   S.flags.qqDecided = true;
   const notes = [];
   if (opt === 'publish') { S.flags.qqPublish = true; setMotive(S, 'qianqian', '得意'); notes.push({ sys: 1, t: '📹 芊芊決定公開。宣讀遺囑那天，她會開直播。' }); }
-  else { S.flags.qqProtect = true; setMotive(S, 'qianqian', '爆紅'); S.items.video = true; notes.push({ sys: 1, t: `📱 芊芊把爺爺的影片交給你了。得到：${W.ITEMS.video}` }); }
+  else { S.flags.qqProtect = true; setMotive(S, 'qianqian', '爆紅'); S.items.video = true; notes.push({ sys: 1, t: '芊芊把爺爺的影片交給你了。' }, { sys: 1, t: W.got('video') }); }
   return { lines: STORY.PERSUADE[opt].concat(notes) };
 }
 
 // ================================================================ 調查物件
 // 看：免費；動手：花一個時段，有人在場會被看到
-function doAct(S, h) {
+function doAct(S, h, pick) {
   const notes = [];
-  const lines = h.act.run(S, notes) || [];
+  const lines = h.act.run(S, notes, pick) || [];
   if (!h.act.free && !h.act.innocent) {
     const wit = present(S).filter(id => !(id === 'kui' && S.chars.kui.bond >= 2));
     if (wit.length) {

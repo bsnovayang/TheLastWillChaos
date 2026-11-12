@@ -122,6 +122,23 @@ const ITEMS = {
   sabotage: '大伯搞垮小叔生意的證據',
 };
 
+// 道具的圖示與用途（🎒 道具面板、拿到時的提示都用這裡的文字）
+// active：要主動使用的道具；其他的拿到就自動生效
+const ITEM_INFO = {
+  liquor:      { icon: '🍶', active: true, use: '和大伯、二姑、小叔、芊芊說話時，選【灌醉】（不花時間）。灌醉後這個時段內，試探、挑撥、嫁禍、勒索都更容易成功。' },
+  necklace:    { icon: '🔑', use: '到書房點保險箱，可以用它打開。' },
+  carKey:      { icon: '🚗', use: '私奔時改成開車離開（從車庫的後門）。' },
+  page:        { icon: '📄', use: '大伯挪用公款的實證。可以拿去勒索、嫁禍、在宣讀遺囑時公開，或交給大伯保住公司。' },
+  diary:       { icon: '📖', use: '記滿了每個家人的秘密（已經變成你手上的實證）。最後一頁……好像跟秋姨有關。' },
+  will2:       { icon: '📜', use: '宣讀遺囑時，可以交給律師。' },
+  video:       { icon: '📱', use: '宣讀遺囑時，可以放給大家看。' },
+  fakeVase:    { icon: '🏺', use: '藏起來，第 4 天就不會被芊芊直播拍到。也是二姑變賣古董的實證。' },
+  careReceipt: { icon: '🧾', use: '宣讀遺囑時，可以當眾說出看護費是誰付的。' },
+  sabotage:    { icon: '🗂', use: '宣讀遺囑時，可以揭穿大伯搞垮小叔生意的事。' },
+};
+// 拿到道具時的提示：名稱＋用途
+const got = (id) => `${ITEM_INFO[id].icon} 得到：${ITEMS[id]}\n→ ${ITEM_INFO[id].use}`;
+
 // ---------------------------------------------------------------- 金錢與門檻
 const MONEY = {
   start: 0,
@@ -136,5 +153,5 @@ const MONEY = {
 // 深交階段名稱
 const BOND = ['陌生', '留意', '交心', '託付'];
 
-return { SLOTS, DAYS, STATS, LEVEL, ROOMS, ROOM_ORDER, SPOTS, CHARS, KUI_ROAM, SECRETS, ITEMS, MONEY, BOND };
+return { SLOTS, DAYS, STATS, LEVEL, ROOMS, ROOM_ORDER, SPOTS, CHARS, KUI_ROAM, SECRETS, ITEMS, ITEM_INFO, got, MONEY, BOND };
 })();

@@ -84,6 +84,53 @@ const ARRIVE = [
   SYS('點人物可以對話、下指令；點 ✦ 可以調查物件。\n下指令或「動手」調查會花掉一個時段，移動、閒聊和看東西不花時間。\n右上角「🎯 目標」可以看你現在想要什麼、離它還有多遠。'),
 ];
 
+// ================================================================ 偷吃布丁（冰箱）
+function puddingRun(S, notes, v) {
+  const h = Engine.present(S), relax = (id) => { S.chars[id].hostile = Math.max(0, S.chars[id].hostile - 1); };
+  S.flags.puddingEaten = true;
+  // 秋姨在：她不阻止你
+  if (h.includes('qiu')) {
+    S.flags.puddingRemade = true;
+    const out = [N('（你打開冰箱，拿出布丁。背後的秋姨停下了手上的動作。）'), N('（你們對看了很久。）'), L('qiu', '……吃慢點。')];
+    if (h.includes('junjie')) {
+      relax('junjie');
+      out.push(L('junjie', '欸欸！那我也要！'), L('qiu', '你小時候偷吃，被老爺罰跪了一個下午。'),
+        L('junjie', '那次明明是阿明哥吃的！他吃完還把湯匙塞進我口袋！'), N('（阿明。你父親的名字。）'),
+        L('junjie', '……結果被抓到的時候，他自己跑去跟爸自首，陪我一起跪。'), N('（秋姨沒有說話，又從冰箱裡拿出一個布丁，放在小叔面前。）'));
+    }
+    if (S.chars.qiu.bond >= 2) {
+      S.flags.puddingClue = true;
+      out.push(L('qiu', '你父親以前也是這樣。被抓到了，還是要把它吃完。'), N('（她說「你父親」的時候，聲音很輕。）'));
+    }
+    out.push(N('（她轉身從櫥櫃裡拿出雞蛋和糖。……她要再做一盒給小葵。）'));
+    Engine.addBond(S, 'qiu', notes);
+    return out;
+  }
+  // 只有小葵在：分不分她
+  if (h.includes('kui') && v) {
+    if (v === 'share') {
+      S.flags.puddingShared = true;
+      Engine.addBond(S, 'kui', notes);
+      return [L('kui', '……一半喔！只有一半喔！'), N('（你們蹲在冰箱前面，一人一口，把布丁吃完了。）'),
+        L('kui', '嘿嘿……這樣我們就是共犯了。秋姨問的話，就說是被貓吃掉的！')];
+    }
+    S.chars.kui.hostile++;
+    S.log.push('小葵哭著跟秋姨說，孫少爺當著她的面把布丁吃掉了。');
+    notes.push(SYS('小葵的敵意 +1。……秋姨晚上就會知道了。'));
+    return [N('（你在她面前，一口一口把布丁吃完。）'), L('kui', '……'), L('kui', '沒、沒關係！我本來就……沒有很想吃……'),
+      N('（她轉過身去擦桌子。同一個地方，擦了很久。）')];
+  }
+  // 沒有秋姨、也沒有小葵：真正的偷吃（下一個時段，群組會出事）
+  S.flags.puddingAlone = true;
+  if (h.includes('junjie')) {
+    S.flags.puddingJunjie = true;
+    return [L('junjie', '欸！分我一口！'), N('（你分了他一口。他吃掉了半盒。）'), L('junjie', '噓——我們什麼都沒看到。')];
+  }
+  const out = [N('（你打開冰箱，拿出布丁。）'), N('很甜。是手工的，焦糖還帶著一點苦。'), N('（你把空盒子塞回冰箱最裡面。）')];
+  if (h.length) out.splice(1, 0, N(`（${h.map(id => W.CHARS[id].name).join('、')}看了你一眼，沒說什麼。）`));
+  return out;
+}
+
 // ================================================================ 招呼（依動機）
 const GREET = {
   uncle: { 奪權: '哼，是你。律師說爸在外面還有個「孫子」，我還以為是詐騙集團。', 報復: '你還有臉來找我？', 急躁: '……走開，我在忙。（他一直盯著保險箱）' },
@@ -95,7 +142,7 @@ const GREET = {
 };
 function greet(S, id) {
   if (id === 'lawyer') return [L('lawyer', '有事等宣讀遺囑那天再說。')];
-  if (id === 'qiu' && S.chars.qiu.bond >= 3 && (S.items.diary || S.flags.sawPhoto) && !S.flags.grandmaKnown) {
+  if (id === 'qiu' && S.chars.qiu.bond >= 3 && (S.items.diary || S.flags.sawPhoto || S.flags.puddingClue) && !S.flags.grandmaKnown) {
     S.flags.grandmaKnown = true; Engine.unlockGoal(S, 'name');
     S.pendingReact = { id: 'qiu', key: 'grandma' };
     return [
@@ -105,6 +152,19 @@ function greet(S, id) {
       L('qiu', '後來他還是被趕出去了。我什麼都做不了。'),
       L('qiu', '……你不用叫我奶奶。只是，讓我再多看你幾眼就好。'),
     ];
+  }
+  if (id === 'qiu' && S.flags.puddingConfessed && !S.flags.puddingTalk && S.chars.qiu.hostile < 3) {
+    S.flags.puddingTalk = true; S.flags.puddingClue = true;
+    const notes = [];
+    Engine.addBond(S, 'qiu', notes);
+    return [L('qiu', '……布丁好吃嗎。'), { who: 'me', t: '……很好吃。對不起。' },
+      L('qiu', '你跟你爸一模一樣。偷吃完，還會自己跑來認。'), N('（她轉過身去。但你看到，她的嘴角動了一下。）')].concat(notes);
+  }
+  if (id === 'kui' && S.flags.puddingLied && !S.flags.puddingForgiven) {
+    S.flags.puddingForgiven = true;
+    S.chars.kui.hostile = Math.max(0, S.chars.kui.hostile - 1);
+    return [L('kui', '孫少爺……秋姨說我偷吃布丁，罵了我好久。'), L('kui', '……可是我知道是你吃的啦。垃圾桶裡的湯匙，是給客人用的那種。'),
+      L('kui', '下次要吃的話，跟我說嘛。我分你一半。'), SYS('小葵原諒你了。（小葵敵意 −1）')];
   }
   const c = S.chars[id];
   let t = (GREET[id] && GREET[id][c.motive]) || '……';
@@ -465,7 +525,7 @@ const HOTSPOTS = {
         return [N('翻到去年第三季，有好幾筆「顧問費」數字大得離譜，經手人都是同一個簽名。'), ...n];
       },
       act: { label: '撕下那一頁帶走', can: (S) => !S.items.page && !S.flags.pageTorn,
-        run: (S, notes) => { S.items.page = true; Engine.raise(S, 'uncle_embezzle', 3, notes); return [N('你小心地撕下那一頁，折好收進口袋。')]; } } },
+        run: (S, notes) => { S.items.page = true; Engine.raise(S, 'uncle_embezzle', 3, notes); notes.push(SYS(W.got('page'))); return [N('你小心地撕下那一頁，折好收進口袋。')]; } } },
     { id: 'willcopy', name: '遺囑副本', x: 172, y: 94,
       look: (S) => S.flags.willFlaw
         ? [N('見證人欄只有一個簽名。你已經知道這份遺囑的問題在哪裡了。')]
@@ -483,7 +543,7 @@ const HOTSPOTS = {
         ? [N('抽屜深處有一疊醫院的單據。付款人一欄，每一張都寫著「萬美鳳」。')]
         : (S.flags.sawLetters = true, [N('抽屜裡都是老爺的舊信。每一封都沒有寄出去，收件人寫著「阿秋」。')]),
       act: { label: '把看護費的收據拿走', can: (S) => S.flags.erguTruth && !S.items.careReceipt,
-        run: (S, notes) => { S.items.careReceipt = true; notes.push(SYS(`🧾 得到：${W.ITEMS.careReceipt}`)); return [N('三年份的收據，疊起來有一個手掌那麼厚。')]; } } },
+        run: (S, notes) => { S.items.careReceipt = true; notes.push(SYS(W.got('careReceipt'))); return [N('三年份的收據，疊起來有一個手掌那麼厚。')]; } } },
     { id: 'safe', name: '保險箱', x: 300, y: 104,
       look: (S) => S.flags.safeOpened ? [N('保險箱已經空了。')] : S.flags.necklaceLost ? [N('保險箱門開著一條縫……裡面空了。有人先來過。')] : [N('鎖孔的形狀很奇怪，不是一般的鑰匙。比較像……某種墜子。')],
       act: { label: '用項鍊打開保險箱', can: (S) => S.items.necklace && !S.flags.safeOpened && !S.flags.necklaceLost,
@@ -493,7 +553,7 @@ const HOTSPOTS = {
           S.items.sabotage = true; S.items.careReceipt = true;
           return [N('項鍊的墜子剛好卡進鎖孔。「喀」的一聲。'), N('裡面有一疊鈔票，還有一本老爺的日記，記滿了每個家人的秘密。'),
             N('日記的最後一頁，只寫了一行字：「阿秋，對不起。我們的兒子，我沒有守住。」'),
-            SYS(`💰 +${W.MONEY.safe} 萬　📖 得到：${W.ITEMS.diary}`), SYS(`📄 日記裡也記著：${W.ITEMS.sabotage}、${W.ITEMS.careReceipt}`)];
+            SYS(`💰 +${W.MONEY.safe} 萬`), SYS(W.got('diary')), SYS(`📄 日記裡也記著：${W.ITEMS.sabotage}、${W.ITEMS.careReceipt}（都放進 🎒 道具了）`)];
         } } },
   ],
   kitchen: [
@@ -502,11 +562,21 @@ const HOTSPOTS = {
       act: { label: '把帳單撿出來', can: (S) => Engine.lvl(S, 'ergu_debt') < 3,
         run: (S, notes) => { Engine.raise(S, 'ergu_debt', 3, notes); return [N('「某某醫美診所　分期第 18 期／共 36 期」。')]; } } },
     { id: 'liquor', name: '櫥櫃裡的高粱酒', x: 276, y: 70,
-      look: (S) => S.items.liquor ? [N('你手上已經有一瓶了。')] : [N('料理用的高粱酒，58 度。標籤上有人用奇異筆寫著「二小姐勿動」。')],
+      look: (S) => (S.flags.sawLiquor = true, S.items.liquor ? [N('你手上已經有一瓶了。')] : [N('料理用的高粱酒，58 度。標籤上有人用奇異筆寫著「二小姐勿動」。')]),
       act: { label: '拿一瓶走（之後可以拿去灌醉別人）', free: true, can: (S) => !S.items.liquor && S.flags.liquorDay !== S.day,
-        run: (S, notes) => { S.items.liquor = true; S.flags.liquorDay = S.day; notes.push(SYS('🍶 得到：高粱酒。和大伯、二姑、小叔、芊芊說話時，可以【灌醉】他們（不花時間）。')); return [N('你把酒瓶藏進外套。很沉。')]; } } },
+        run: (S, notes) => { S.items.liquor = true; S.flags.liquorDay = S.day; notes.push(SYS(W.got('liquor'))); return [N('你把酒瓶藏進外套。很沉。')]; } } },
     { id: 'fridge', name: '冰箱', x: 211, y: 76,
-      look: () => [N('冰箱裡有一盒布丁，上面貼著便條：「小葵的，偷吃者死。——秋」')] },
+      look: (S) => !S.flags.puddingEaten ? [N('冰箱裡有一盒布丁，上面貼著便條：「小葵的，偷吃者死。——秋」')]
+        : S.flags.puddingRemade ? [N('冰箱裡多了一盒新的布丁。便條換了一張：「小葵的。這次是真的。——秋」')]
+        : [N('布丁的位置空了。便條還貼在那裡，看起來比剛才更兇。')],
+      // 一局一次，不花時間；誰在廚房，反應就不一樣
+      act: { label: '偷吃布丁', free: true, can: (S) => !S.flags.puddingEaten,
+        sub: (S) => { const h = Engine.present(S); return '不花時間・' + (h.length ? h.map(id => W.CHARS[id].name).join('、') + '在旁邊' : '四下無人'); },
+        // 只有小葵在：她會先叫出來，讓你選要不要分她
+        ask: (S) => { const h = Engine.present(S); if (!h.includes('kui') || h.includes('qiu')) return null;
+          return { lines: [N('（你打開冰箱，手才剛碰到布丁——）'), L('kui', '孫、孫少爺！那、那是我的布丁！')],
+            options: [{ label: '「分妳一半？」', value: 'share' }, { label: '（當著她的面，全部吃掉）', value: 'all' }] }; },
+        run: (S, notes, v) => puddingRun(S, notes, v) } },
   ],
   living: [
     { id: 'vase', name: '古董花瓶', x: 141, y: 92,
@@ -516,7 +586,7 @@ const HOTSPOTS = {
         return [N('看起來很貴。你不太懂古董。')];
       },
       act: { label: '把假花瓶藏起來', can: (S) => !S.flags.vaseHandled,
-        run: (S, notes) => { S.flags.vaseHandled = true; S.items.fakeVase = true; Engine.raise(S, 'ergu_antique', 3, notes); return [N('你把花瓶塞進大衣裡。至少，不會有人在直播上看到它了。')]; } } },
+        run: (S, notes) => { S.flags.vaseHandled = true; S.items.fakeVase = true; Engine.raise(S, 'ergu_antique', 3, notes); notes.push(SYS(W.got('fakeVase'))); return [N('你把花瓶塞進大衣裡。至少，不會有人在直播上看到它了。')]; } } },
     { id: 'celadon', name: '櫃子裡的青瓷', x: 40, y: 62,
       look: () => [N('這個是真的。光看釉色就知道，可以賣不少錢。')],
       act: { label: `偷去賣掉（+${W.MONEY.antique} 萬）`, can: (S) => !S.flags.soldAntique,
@@ -540,10 +610,11 @@ const HOTSPOTS = {
     { id: 'key', name: '牆上的車鑰匙', x: 281, y: 59,
       look: (S) => S.items.carKey ? [N('鉤子是空的。鑰匙在你這。')] : S.flags.keyStolen ? [N('鉤子是空的。有人先拿走了。')] : [N('古董車的鑰匙就掛在鉤子上。')],
       act: { label: '拿走車鑰匙', can: (S) => !S.items.carKey && !S.flags.keyStolen,
-        run: (S, notes) => { S.items.carKey = true; notes.push(SYS(`🔑 得到：${W.ITEMS.carKey}`)); return [N('你把鑰匙收進口袋。')]; } } },
+        run: (S, notes) => { S.items.carKey = true; notes.push(SYS(W.got('carKey'))); return [N('你把鑰匙收進口袋。')]; } } },
     { id: 'cage', name: '蓋著帆布的籠子', x: 51, y: 104,
       look: (S) => {
         if (S.flags.peacockReleased) return [N('籠子是空的。地上只剩幾根羽毛。')];
+        S.flags.sawPeacock = true;
         const n = []; Engine.raise(S, 'junjie_peacock', 3, n); return [N('帆布底下有東西在動。你掀開一角——一隻孔雀正瞪著你。'), ...n];
       },
       act: { label: '把孔雀放出去（大家都會跑去靈堂抓孔雀，其他房間會空出來）', free: true, can: (S) => !S.flags.peacockReleased,
@@ -683,6 +754,7 @@ function condolenceFallout(S) {
 }
 
 const TURNS = [
+  { id: 'pudding_gone', if: (S) => S.flags.puddingAlone, run: () => ({}) },   // 群組訊息在 group.js
   { id: 'qiu_photo', if: (S) => S.chars.qiu.bond >= 2 && S.room === 'kitchen' && S.slot === 2 && S.chars.qiu.loc === 'kitchen', run: (S) => {
     S.flags.sawPhoto = true;
     return { room: 'kitchen', scene: [

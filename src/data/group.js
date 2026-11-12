@@ -91,6 +91,17 @@ const ON = {
     ['sys', '芊芊 正在輸入……'],
     ['sys', '芊芊 正在輸入……'],
   ],
+  pudding_gone: (S) => [
+    ['qiu', '冰箱的布丁，是誰吃的。'],
+    ['qianqian', '不是我 我在減肥'],
+    ...(S.chars.junjie.gone ? [] : S.flags.puddingJunjie
+      ? [['junjie', '我發誓不是我！！！'], ['junjie', '我只吃了一半', 'recall']]
+      : [['junjie', '我發誓不是我！！！']]),
+    ['uncle', '這種小事不要發群組'],
+    ['ergu', '我們家有布丁？'],
+    ['qiu', '那是小葵的。'],
+    ['sys', '已讀 5'],
+  ],
   qiu_despair: [
     ['qiu', '明天的早餐，請各位自理。'],
     ['junjie', '秋姨？？'],
@@ -154,6 +165,15 @@ const REPLIES = [
 
   { on: 'peacock', label: '「孔雀好漂亮 😂」', msg: '孔雀好漂亮 😂', replies: [['junjie', '對吧！！！'], ['uncle', '俊傑']], fx: (S) => { relax(S, 'junjie'); return '只有小叔很開心。'; } },
 
+  { on: 'pudding_gone', label: '「是我吃的，對不起 🙇」', msg: '是我吃的 對不起 🙇',
+    replies: [['junjie', '哈哈哈哈哈 勇者'], ['qianqian', '截圖了'], ['sys', '秋姨 已讀']],
+    fx: (S) => { S.flags.puddingConfessed = true; return '秋姨已讀了很久，沒有回。……也許她有話想私下跟你說。'; } },
+  { on: 'pudding_gone', label: '「我也不知道耶」', msg: '我也不知道耶',
+    replies: [['qiu', '嗯。']],
+    fx: (S) => { S.flags.puddingLied = true; S.chars.kui.hostile++; return '秋姨沒有再追問。……小葵被唸了一頓（小葵敵意 +1）。'; } },
+  { on: 'pudding_gone', when: (S) => !S.chars.junjie.gone, label: '「應該是小叔吧」', stat: 'guile', min: 4, msg: '應該是小叔吧 他最愛吃甜的',
+    replies: [['junjie', '？？？？？'], ['uncle', '俊傑'], ['ergu', '俊傑你幾歲了'], ['junjie', '不是我啦！！！！']],
+    fx: (S) => { S.chars.junjie.hostile++; S.lies++; return '大家都信了。小叔百口莫辯（小叔敵意 +1）。……你又說了一個謊。'; } },
   { on: 'd5_crash', label: '「R.I.P. 大門柱子」', msg: 'R.I.P. 大門柱子 🕯️', replies: [['qianqian', '哈哈哈哈哈哈'], ['junjie', '你們好過分']], fx: (S) => { relax(S, 'qianqian'); return '芊芊笑了。'; } },
 
   { on: 'any', label: '（已讀不回）', msg: null, replies: [], fx: () => null },

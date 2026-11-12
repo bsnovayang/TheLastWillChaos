@@ -215,13 +215,26 @@ $('#btnCards').onclick = () => {
     const sc = W.SECRETS[sid];
     return `<div class="card lv${lv}"><span class="lv">【${W.LEVEL[lv]}】</span><b>${W.CHARS[sc.who].name}</b>　${sc.title}</div>`;
   }).join('') || '<div class="empty">還沒有任何把柄。去找人套話，或調查房間裡的東西。</div>';
-  const items = Object.keys(S.items).filter(k => S.items[k]).map(k => `<span class="chip">${W.ITEMS[k]}</span>`).join('') || '<span class="empty">（沒有）</span>';
-  openPanel('cardPanel', `${cards}<h4>道具</h4>${items}<div class="hint">傳聞：只能拿來挑撥　線索：試探更容易成功　實證：可以勒索、嫁禍、公開</div>`);
+  openPanel('cardPanel', `${cards}<div class="hint">傳聞：只能拿來挑撥　線索：試探更容易成功　實證：可以勒索、嫁禍、公開<br>拿到的東西在 🎒 道具。</div>`);
 };
 $('#btnGoal').onclick = () => {
   const html = STORY.goals(S).map(g => `<div class="goal ${g.late ? 'late' : ''}"><h3>${g.title}${g.late ? '<em>（……也許已經太遲了）</em>' : ''}</h3><p>${g.desc}</p>${g.steps.map(t => `<div class="gstep">${t}</div>`).join('')}</div>`).join('')
     + '<div class="hint">和大家熟一點、找到更多證據，也許會發現別的可能。</div>';
   openPanel('goalPanel', html);
+};
+$('#btnItems').onclick = () => {
+  const own = Object.keys(W.ITEM_INFO).filter(k => S.items[k]);
+  const card = (icon, name, use, tag) => `<div class="icard"><div class="iicon">${icon}</div><div><b>${name}</b>${tag}<p>${use}</p></div></div>`;
+  const active = own.filter(k => W.ITEM_INFO[k].active), passive = own.filter(k => !W.ITEM_INFO[k].active);
+  // 你發現、但還沒用的機關
+  const tricks = [];
+  if (S.flags.sawPeacock && !S.flags.peacockReleased) tricks.push(card('🦚', '車庫的孔雀', '到車庫點籠子【動手】放出去（不花時間，一局一次）：這個時段所有人都會跑去靈堂抓孔雀，其他房間會空出來。代價是小叔偷養孔雀的事曝光。', '<em class="ion">機關</em>'));
+  if (S.flags.sawLiquor && !S.items.liquor && S.flags.liquorDay !== S.day) tricks.push(card('🍶', '廚房的高粱酒', '到廚房點櫥櫃拿一瓶（不花時間，每天一瓶）。', '<em class="ion">機關</em>'));
+  const html = (active.length ? '<h4>可以主動使用</h4>' + active.map(k => card(W.ITEM_INFO[k].icon, W.ITEMS[k], W.ITEM_INFO[k].use, '<em class="ion">主動</em>')).join('') : '')
+    + (tricks.length ? '<h4>你發現的機關</h4>' + tricks.join('') : '')
+    + (passive.length ? '<h4>拿到就會生效</h4>' + passive.map(k => card(W.ITEM_INFO[k].icon, W.ITEMS[k], W.ITEM_INFO[k].use, '')).join('') : '')
+    || '<div class="empty">還沒有任何道具。房間裡有 ✦ 的地方都可以調查看看。</div>';
+  openPanel('itemPanel', html);
 };
 $('#btnStatus').onclick = () => {
   const st = Object.entries(W.STATS).map(([k, n]) => `<div class="stat"><span>${n}</span><b>${'●'.repeat(S.stats[k])}${'○'.repeat(5 - S.stats[k])}</b></div>`).join('');
@@ -313,6 +326,7 @@ function recordRun(id) {
   if (sub && !rec.subs.includes(sub)) rec.subs.push(sub);
   for (const cid of Object.keys(S.chars)) m.bonds[cid] = Math.max(m.bonds[cid] || 0, S.chars[cid].bond);
   if (S.flags.grandmaKnown) m.flags.grandmaKnown = true;
+  if (S.flags.puddingClue) m.flags.puddingClue = true;
   saveMeta(m);
   return m;
 }
@@ -332,7 +346,8 @@ function openGallery(tab = 'endings') {
     body = '<div class="gchars">' + Object.keys(W.CHARS).map(id => {
       const b = m.bonds[id] || 0, B = STORY.BONDS[id];
       const stage = (k) => (b >= k ? (B[k] || []).map(l => `<div class="gline">${esc(l.t)}</div>`).join('') : `<div class="gline locked">？？？（${W.BOND[k]}）</div>`);
-      const extra = id === 'qiu' && m.flags.grandmaKnown ? '<div class="gline gold">她是你的親奶奶。</div>' : '';
+      const extra = (id === 'qiu' && m.flags.puddingClue ? '<div class="gline">「你跟你爸一模一樣。」——布丁</div>' : '')
+        + (id === 'qiu' && m.flags.grandmaKnown ? '<div class="gline gold">她是你的親奶奶。</div>' : '');
       const ends = (STORY.GALLERY_CHAR[id] || []).map(e => `<span class="${m.endings[e] ? '' : 'locked'}">${m.endings[e] ? STORY.ENDINGS[e].title : '？？？'}</span>`).join('');
       return `<div class="gchar"><div class="ghead"><img src="${FACE[id].normal.toDataURL()}" style="background:${PBG[id]}"><div><b>${W.CHARS[id].full}</b><small>最深的關係：${W.BOND[b]}</small></div></div>
         ${stage(1)}${stage(2)}${stage(3)}${extra}<div class="gsubs">${ends}</div></div>`;
@@ -465,10 +480,13 @@ async function inspect(h) {
   if (h.act && h.act.can(S)) {
     const label = typeof h.act.label === 'function' ? h.act.label(S) : h.act.label;
     const who = Engine.present(S).filter(id => !(id === 'kui' && S.chars.kui.bond >= 2));
-    const warn = h.act.free ? '不花時間' : h.act.innocent ? '花一個時段' : `花一個時段${who.length ? '・⚠ 會被' + who.map(id => W.CHARS[id].name).join('、') + '看到' : '・沒有人在'}`;
+    const warn = h.act.sub ? h.act.sub(S) : h.act.free ? '不花時間' : h.act.innocent ? '花一個時段' : `花一個時段${who.length ? '・⚠ 會被' + who.map(id => W.CHARS[id].name).join('、') + '看到' : '・沒有人在'}`;
     const v = await choose([{ label: '【動手】' + label, sub: warn, value: 1 }, { label: '離開', value: 0 }]);
     if (v) {
-      const r = Engine.doAct(S, h);
+      let pick;
+      const q = h.act.ask && h.act.ask(S);
+      if (q) { await say(q.lines); pick = await choose(q.options); }
+      const r = Engine.doAct(S, h, pick);
       await say(r.lines);
       await flushMoments();
       if (S.ending) return ending(S.ending);
@@ -703,12 +721,13 @@ async function boot() {
     if (location.search.includes('changed')) Object.assign(S.flags, { safeOpened: 1, vaseHandled: 1, soldAntique: 1, peacockReleased: 1, carWrecked: 1 }), S.items.carKey = 1, S.items.liquor = 1;
     $('#hud').style.display = 'flex'; hud();
   }
-  if (['quick', 'talk', 'wheel', 'map', 'goal', 'phone'].includes(h)) {
+  if (['quick', 'talk', 'wheel', 'map', 'goal', 'phone', 'items'].includes(h)) {
     $('#title').style.display = 'none';
     S = Engine.newGame({ moral: 3, know: 3, guile: 3, charm: 3 }); S.money += W.MONEY.allowance;
     $('#hud').style.display = 'flex'; hud();
     if (h === 'talk') talk('uncle');
     if (h === 'map') $('#btnMap').onclick();
+    if (h === 'items') { Object.assign(S.items, { liquor: 1, necklace: 1, page: 1, carKey: 1 }); S.flags.sawPeacock = 1; $('#btnItems').onclick(); }
     if (h === 'phone') { S.flags.tookCondolence = 1; S.flags.condolenceDay = 2; while (!(S.day === 4 && S.slot === 1)) Engine.endSlot(S); hud(); openPhone(); }
     if (h === 'goal') { S.chars.kui.bond = 1; S.cards.uncle_embezzle = 3; S.chars.qiu.bond = 1; $('#btnGoal').onclick(); }
     if (h === 'wheel') Wheel.spin(Engine.odds(S, 'sow', 'uncle', { b: 'junjie' }), { title: '【挑撥】大伯 → 小叔　（魅力 3　vs　大伯的城府 5）', canReroll: () => true, onReroll: () => {}, mishap: STORY.MISHAP.sow });
