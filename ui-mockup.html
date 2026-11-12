@@ -1,0 +1,337 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>The Last Will & Chaos — UI 樣式原型</title>
+<style>
+:root{--gold:#e8b84a;--text:#f3ecdc;--blue:#3d5fb8}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:#07070c;color:var(--text);
+  font-family:"Microsoft JhengHei","PingFang TC","Noto Sans TC",sans-serif}
+body{display:flex;align-items:center;justify-content:center}
+#stage{position:relative;width:min(100vw,calc(100vh*16/9));aspect-ratio:16/9;overflow:hidden;
+  background:#000;container-type:inline-size;user-select:none}
+#scene{position:absolute;inset:0;width:100%;height:100%;image-rendering:pixelated}
+
+/* HUD */
+#hud{position:absolute;left:1.5cqw;right:1.5cqw;top:1.2cqw;display:flex;gap:1cqw;align-items:center;pointer-events:none}
+.pill{pointer-events:auto;background:rgba(16,20,44,.92);border:.35cqw solid var(--blue);color:var(--text);
+  font:inherit;font-size:1.75cqw;font-weight:700;padding:.35cqw 1.2cqw;border-radius:.45cqw;
+  box-shadow:0 .35cqw 0 rgba(0,0,0,.45)}
+.pill.gold{border-color:var(--gold);color:var(--gold)}
+button.pill{cursor:pointer}
+button.pill:hover{background:#26306a}
+.slots span{opacity:.35;margin:0 .25cqw}
+.slots span.on{opacity:1;color:var(--gold)}
+.spacer{flex:1}
+
+/* 對話框 */
+#box{position:absolute;left:2.5%;right:2.5%;bottom:3.5%;height:30%;display:none;cursor:pointer;
+  background:linear-gradient(#1a2350,#0e1330);border:.55cqw solid var(--blue);border-radius:.6cqw;
+  box-shadow:0 0 0 .35cqw #0a0d1e,inset 0 0 0 .3cqw #22337a,0 .8cqw 0 rgba(0,0,0,.5)}
+#box .c{position:absolute;width:1.6cqw;height:1.6cqw;background:var(--gold);border:.3cqw solid #7a5414}
+#box .c.tl{left:-1cqw;top:-1cqw}#box .c.tr{right:-1cqw;top:-1cqw}
+#box .c.bl{left:-1cqw;bottom:-1cqw}#box .c.br{right:-1cqw;bottom:-1cqw}
+#pframe{position:absolute;left:1.4cqw;bottom:1.3cqw;width:15cqw;height:15cqw;
+  border:.5cqw solid var(--gold);box-shadow:0 0 0 .3cqw #6a4810;overflow:hidden}
+#pcan{width:100%;height:100%;image-rendering:pixelated;display:block}
+#name{position:absolute;left:17.6cqw;top:-2.6cqw;background:#18214a;border:.45cqw solid var(--gold);
+  padding:.2cqw 1.8cqw;color:var(--gold);font-weight:900;font-size:2.5cqw;letter-spacing:.2cqw;
+  box-shadow:0 0 0 .25cqw #0a0d1e}
+#text{position:absolute;left:18cqw;right:2.5cqw;top:2.6cqw;bottom:2cqw;font-size:2.3cqw;line-height:1.6;white-space:pre-wrap}
+#box.noport #pframe,#box.noport #name{display:none}
+#box.noport #text{left:3cqw;top:2cqw;color:#d8d0bc;font-style:italic}
+#box.sys #text{color:#9fd0ff}
+#more{position:absolute;right:2cqw;bottom:1cqw;color:var(--gold);font-size:1.7cqw;animation:blink 1s steps(2) infinite}
+@keyframes blink{50%{opacity:0}}
+.choices{display:flex;flex-direction:column;gap:.7cqw;margin-top:.4cqw}
+.choices button{font:inherit;font-size:2cqw;text-align:left;color:var(--text);background:#253066;
+  border:.3cqw solid #5a7ad8;padding:.3cqw 1.4cqw;cursor:pointer;border-radius:.3cqw}
+.choices button:hover{border-color:var(--gold);color:var(--gold);background:#2e3a7a}
+.choices button b{color:var(--gold)}
+
+/* 浮動名牌 */
+#tip{position:absolute;display:none;transform:translate(-50%,-100%);background:rgba(10,12,30,.9);
+  border:.25cqw solid var(--gold);color:var(--gold);font-size:1.5cqw;font-weight:700;padding:.1cqw .8cqw;pointer-events:none;white-space:nowrap}
+
+/* 面板 */
+.panel{position:absolute;inset:9% 8% 9% 8%;display:none;background:rgba(14,19,48,.97);
+  border:.55cqw solid var(--blue);border-radius:.6cqw;box-shadow:0 0 0 .35cqw #0a0d1e;padding:2cqw 2.5cqw}
+.panel h2{margin:0 0 1.4cqw;color:var(--gold);font-size:2.6cqw}
+.panel .close{position:absolute;right:1.5cqw;top:1.2cqw}
+#mapgrid{display:grid;grid-template-columns:1fr 1.4fr 1fr;grid-template-rows:1fr 1fr;gap:1cqw;height:calc(100% - 5cqw);
+  grid-template-areas:"study hall kitchen" "living hall garage"}
+.room{border:.35cqw solid #4a5a9a;background:#1b2350;border-radius:.4cqw;padding:1cqw;cursor:pointer;position:relative}
+.room:hover{border-color:var(--gold)}
+.room.here{border-color:var(--gold);background:#2a2a50}
+.room h3{margin:0 0 .8cqw;font-size:2.1cqw}
+.room.here h3::after{content:" 📍你在這裡";font-size:1.4cqw;color:var(--gold)}
+.chip{display:inline-flex;align-items:center;gap:.4cqw;background:#0e1330;border:.2cqw solid #4a5a9a;
+  border-radius:2cqw;padding:.15cqw .8cqw .15cqw .2cqw;margin:0 .4cqw .4cqw 0;font-size:1.45cqw}
+.chip img{width:2.8cqw;height:2.8cqw;image-rendering:pixelated;border-radius:50%;background:#e9b0aa}
+.chip.unk{opacity:.6;padding-left:.8cqw}
+.card{border:.3cqw solid #8a6a2a;background:#2a2316;border-radius:.4cqw;padding:1cqw 1.4cqw;margin-bottom:1cqw;font-size:1.8cqw}
+.card .lv{float:right;color:#ffcf6a;font-size:1.5cqw}
+.card .who{color:#ff9a8a;font-weight:700}
+.empty{opacity:.6;font-size:1.8cqw}
+
+/* 提示 */
+#toast{position:absolute;right:2cqw;top:6cqw;background:#3a2c12;border:.35cqw solid var(--gold);color:#ffe2a0;
+  font-size:1.7cqw;padding:.6cqw 1.4cqw;border-radius:.4cqw;opacity:0;transform:translateX(3cqw);transition:.35s;pointer-events:none}
+#toast.show{opacity:1;transform:none}
+</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="scene"></canvas>
+
+  <div id="hud">
+    <div class="pill gold">第 2 天</div>
+    <div class="pill slots"><span>早</span><span>午</span><span class="on">●晚</span></div>
+    <div class="pill">📍 書房</div>
+    <div class="spacer"></div>
+    <button class="pill" id="btnCards">📁 把柄</button>
+    <button class="pill" id="btnMap">🗺 地圖</button>
+  </div>
+
+  <div id="tip"></div>
+
+  <div id="box">
+    <i class="c tl"></i><i class="c tr"></i><i class="c bl"></i><i class="c br"></i>
+    <div id="pframe"><canvas id="pcan" width="82" height="82"></canvas></div>
+    <div id="name"></div>
+    <div id="text"></div>
+    <div id="more">▶ 繼續</div>
+  </div>
+
+  <div class="panel" id="mapPanel">
+    <h2>萬家豪宅・平面圖</h2><button class="pill close" data-close>✕</button>
+    <div id="mapgrid"></div>
+  </div>
+
+  <div class="panel" id="cardPanel">
+    <h2>📁 把柄筆記</h2><button class="pill close" data-close>✕</button>
+    <div id="cardList"></div>
+  </div>
+
+  <div id="toast"></div>
+</div>
+
+<script>
+'use strict';
+// ================= 美術資源（由 art/*.px.js 經 pxl 輸出） =================
+const W = 320, H = 180;
+const R = (g, x, y, w, h, c) => { g.fillStyle = c; g.fillRect(Math.round(x), Math.round(y), Math.round(w), Math.round(h)); };
+function disc(g, cx, cy, rx, ry, c) {
+  for (let y = -ry; y <= ry; y++) { const w = Math.round(rx * Math.sqrt(Math.max(0, 1 - (y * y) / (ry * ry)))); R(g, cx - w, cy + y, w * 2 + 1, 1, c); }
+}
+const IMG = {};
+function load(key, src) { return new Promise((ok, ng) => { const im = new Image(); im.onload = () => { IMG[key] = im; ok(); }; im.onerror = () => ng(src); im.src = src; }); }
+const EXPR = { kui: ['normal', 'smile', 'shock', 'sad'], uncle: ['normal', 'angry', 'shock', 'smug'] };
+const assetsReady = Promise.all([
+  load('study', 'assets/scenes/study.png'),
+  load('kui_chibi', 'assets/sprites/kui_chibi.png'), load('uncle_chibi', 'assets/sprites/uncle_chibi.png'),
+  ...Object.entries(EXPR).flatMap(([who, list]) => list.map(e => load(`${who}_${e}`, `assets/sprites/${who}_${e}.png`))),
+]);
+const portrait = (who, e) => IMG[`${who}_${e}`] || IMG[`${who}_normal`];
+// 場景已經打過光，人物另外疊上去，所以幫人物補一層夜色，讓它融入背景
+function nightTint(im) {
+  const c = document.createElement('canvas'); c.width = im.width; c.height = im.height;
+  const g = c.getContext('2d'); g.drawImage(im, 0, 0);
+  g.globalCompositeOperation = 'source-atop'; g.fillStyle = 'rgba(28,22,70,.30)'; g.fillRect(0, 0, c.width, c.height);
+  return c;
+}
+
+// ================= 頭頂情緒圖示 =================
+const ICONS = {
+  '!': { col: '#e03030', bub: 1, m: ['..#..', '..#..', '..#..', '.....', '..#..'] },
+  '?': { col: '#3060d0', bub: 1, m: ['.###.', '....#', '..##.', '.....', '..#..'] },
+  heart: { col: '#ff5a8a', bub: 1, m: ['.#.#.', '#####', '#####', '.###.', '..#..'] },
+  anger: { col: '#e02828', bub: 0, m: ['.#.#.', '##.##', '.....', '##.##', '.#.#.'] },
+  sweat: { col: '#7ac0ff', bub: 0, m: ['..#..', '.###.', '#####', '#####', '.###.'] },
+};
+function drawIcon(g, name, x, y) {
+  const ic = ICONS[name]; if (!ic) return;
+  if (ic.bub) { R(g, x - 1, y - 1, 11, 10, '#140c14'); R(g, x, y, 9, 8, '#fff'); R(g, x + 3, y + 8, 3, 2, '#140c14'); R(g, x + 4, y + 8, 1, 1, '#fff'); }
+  ic.m.forEach((row, j) => [...row].forEach((ch, i) => { if (ch === '#') R(g, x + 2 + i, y + 1 + j + (ic.bub ? 0 : 0), 1, 1, ic.col); }));
+}
+
+// ================= 遊戲狀態 =================
+const cv = document.getElementById('scene'); cv.width = W; cv.height = H;
+const g = cv.getContext('2d');
+const actors = [
+  { id: 'kui', name: '小葵', x: 52, y: 154, icon: null, talk: talkKui },
+  { id: 'uncle', name: '大伯 萬國棟', x: 280, y: 156, icon: null, talk: talkUncle },
+];
+const S = { cards: [], kuiFavor: 0, askedKui: false, flirted: false, uncleDone: false };
+let hover = null, busy = false;
+
+function frame(t) {
+  g.drawImage(IMG.study, 0, 0);
+  for (const a of actors) {
+    disc(g, a.x, a.y, 9, 2, 'rgba(0,0,0,.35)');
+    g.drawImage(a.spr, a.x - 13, a.y - 41);
+    if (hover === a) { g.globalCompositeOperation = 'lighter'; g.globalAlpha = .22; g.drawImage(a.spr, a.x - 13, a.y - 41); g.globalAlpha = 1; g.globalCompositeOperation = 'source-over'; }
+  }
+  // 燭光、檯燈微微閃爍
+  g.globalCompositeOperation = 'lighter';
+  const fl = (k) => .5 + .5 * Math.sin(t / 130 * k) * Math.sin(t / 57 * k + 1);
+  disc(g, 126, 89, 7, 6, `rgba(255,170,80,${.05 + fl(1) * .05})`);
+  disc(g, 169, 89, 7, 6, `rgba(255,170,80,${.05 + fl(1.3) * .05})`);
+  disc(g, 113, 93, 16, 8, `rgba(255,210,140,${.02 + fl(.4) * .025})`);
+  g.globalCompositeOperation = 'source-over';
+  for (const a of actors) if (a.icon) drawIcon(g, a.icon, a.x - 5, a.y - 54 + Math.round(Math.sin(t / 250) * 1.2));
+  requestAnimationFrame(frame);
+}
+
+// ================= 點擊人物 =================
+const tip = document.getElementById('tip');
+function pick(e) {
+  const r = cv.getBoundingClientRect(), x = (e.clientX - r.left) / r.width * W, y = (e.clientY - r.top) / r.height * H;
+  return actors.find(a => x > a.x - 12 && x < a.x + 12 && y > a.y - 40 && y < a.y + 2) || null;
+}
+cv.addEventListener('mousemove', e => {
+  hover = busy ? null : pick(e);
+  cv.style.cursor = hover ? 'pointer' : 'default';
+  if (hover) { tip.style.display = 'block'; tip.textContent = hover.name; tip.style.left = hover.x / W * 100 + '%'; tip.style.top = (hover.y - 44) / H * 100 + '%'; }
+  else tip.style.display = 'none';
+});
+cv.addEventListener('click', e => { const a = pick(e); if (a && !busy) { hover = null; tip.style.display = 'none'; run(a.talk()); } });
+
+// ================= 對話系統 =================
+const box = document.getElementById('box'), nameEl = document.getElementById('name'), textEl = document.getElementById('text'),
+  more = document.getElementById('more'), pcan = document.getElementById('pcan'), pctx = pcan.getContext('2d');
+const PEOPLE = { kui: { name: '小葵', bg: '#f0b4b0' }, uncle: { name: '大伯', bg: '#a9b6cc' } };
+let queue = [], typing = null, full = '', choosing = false;
+
+function run(seq) { busy = true; queue = seq.slice(); next(); }
+function next() {
+  if (!queue.length) { box.style.display = 'none'; busy = false; return; }
+  const l = queue.shift();
+  if (l.fx) l.fx();
+  if (l.choices) return showChoices(l.choices);
+  if (!l.t) return next();
+  box.style.display = 'block'; choosing = false;
+  box.classList.toggle('noport', !l.who); box.classList.toggle('sys', !!l.sys);
+  if (l.who) {
+    const p = PEOPLE[l.who]; nameEl.textContent = p.name; pcan.parentElement.style.background = p.bg;
+    pctx.clearRect(0, 0, 82, 82); pctx.drawImage(portrait(l.who, l.e || 'normal'), 0, 0);
+  }
+  full = l.t; let i = 0; textEl.textContent = ''; more.style.display = 'none';
+  clearInterval(typing);
+  typing = setInterval(() => { textEl.textContent = full.slice(0, ++i); if (i >= full.length) done(); }, 28);
+}
+function done() { clearInterval(typing); typing = null; textEl.textContent = full; more.style.display = 'block'; }
+function showChoices(list) {
+  choosing = true; more.style.display = 'none';
+  const wrap = document.createElement('div'); wrap.className = 'choices';
+  list.forEach(c => {
+    const b = document.createElement('button'); b.innerHTML = c.label;
+    b.onclick = ev => { ev.stopPropagation(); choosing = false; run(c.seq()); };
+    wrap.appendChild(b);
+  });
+  textEl.textContent = ''; textEl.appendChild(wrap);
+}
+box.addEventListener('click', () => { if (choosing) return; if (typing) done(); else next(); });
+
+// ================= 劇本（示範） =================
+function talkKui() {
+  const opts = [];
+  if (!S.askedKui) opts.push({ label: '<b>【試探】</b>大伯在念什麼？', seq: () => [
+    { sys: 1, t: '🎲 城府檢定：你 3 ＋ 骰子 2 ＝ 5　vs　小葵的戒心 2　→　成功！' },
+    { who: 'kui', e: 'shock', t: '他、他一直在試保險箱的密碼！老爺的生日、他自己的生日，連狗狗的生日都試了！' },
+    { who: 'kui', e: 'sad', t: '……啊。我是不是不該講出來？秋姨會殺了我的……', fx: () => { S.askedKui = true; actor('kui').icon = 'sweat'; actor('uncle').icon = '?';
+      gainCard({ who: '大伯', what: '半夜偷試保險箱密碼', lv: '傳聞' }); } },
+  ] });
+  if (!S.flirted) opts.push({ label: '<b>【示好】</b>在這裡工作還習慣嗎？', seq: () => [
+    { who: 'kui', e: 'smile', t: '秋姨很兇，可是會偷偷留布丁給我！還有老爺……老爺以前常叫我陪他下象棋。' },
+    { who: 'kui', e: 'sad', t: '他每次輸了都說「這局不算」……我有點想他。', fx: () => { S.flirted = true; S.kuiFavor++; actor('kui').icon = 'heart'; } },
+    { sys: 1, t: '💗 小葵好感 ＋1' },
+  ] });
+  opts.push({ label: '離開', seq: () => [] });
+  const intro = S.askedKui || S.flirted
+    ? [{ who: 'kui', e: 'normal', t: '孫少爺還有什麼事嗎？我、我真的在認真打掃喔！' }]
+    : [
+      { who: 'kui', e: 'shock', t: '哇啊！……原、原來是孫少爺！我還以為是老爺回來了！' },
+      { who: 'kui', e: 'smile', t: '我是小葵，上個月才來的實習女僕。秋姨說不能進書房，所以我是來「偷偷打掃」的！' },
+      { who: 'kui', e: 'normal', t: '不過大伯從晚飯後就一直待在這裡，對著保險箱念念有詞耶……' },
+    ];
+  return [...intro, { choices: opts }];
+}
+function talkUncle() {
+  if (S.uncleDone) return [{ who: 'uncle', e: 'normal', t: '還不走？我在緬懷我爸，你在這裡很礙眼。' }];
+  const has = S.cards.length > 0;
+  return [
+    { who: 'uncle', e: 'smug', t: '哼。律師說爸在外面還有個「孫子」，我還以為是詐騙集團打來的。' },
+    { who: 'uncle', e: 'normal', t: '書房是爸生前最重要的地方。我在這裡……是為了緬懷他。' },
+    { choices: [
+      { label: '<b>【試探】</b>緬懷到要對著保險箱嗎？' + (has ? '　<small>📁 使用把柄</small>' : ''), seq: () => has ? [
+        { sys: 1, t: '🎲 城府檢定：你 3 ＋ 骰子 1 ＋ 把柄 2 ＝ 6　vs　大伯的城府 5　→　成功！' },
+        { who: 'uncle', e: 'shock', t: '你、你怎麼會……我只是在確認爸的遺物有沒有被偷！這是孝順！孝順你懂不懂！' },
+        { sys: 1, t: '大伯陷入【心虛】狀態。　📁 把柄升級：傳聞 → 線索', fx: () => { S.uncleDone = true; actor('uncle').icon = '!'; S.cards[0].lv = '線索'; toast('📁 把柄升級：大伯 → 線索'); } },
+      ] : [
+        { sys: 1, t: '🎲 城府檢定：你 3 ＋ 骰子 1 ＝ 4　vs　大伯的城府 5　→　失敗' },
+        { who: 'uncle', e: 'smug', t: '年輕人，想套我的話？再修練二十年吧。' },
+        { sys: 1, t: '提示：大伯城府很高，先從別人那裡拿到把柄再來。', fx: () => { actor('uncle').icon = null; } },
+      ] },
+      { label: '<b>【挑撥】</b>小叔說你在挪用公款。', seq: () => [
+        { sys: 1, t: '🎲 魅力檢定：你 2 ＋ 骰子 1 ＝ 3　vs　大伯的城府 5　→　失敗' },
+        { who: 'uncle', e: 'angry', t: '俊傑那個廢物說的？他上個月才跟我借錢，要開什麼「榴槤口味珍奶」！' },
+        { who: 'uncle', e: 'angry', t: '……不過，他敢在外人面前講我，這筆帳我記下了。', fx: () => { S.uncleDone = true; actor('uncle').icon = 'anger'; } },
+        { sys: 1, t: '挑撥雖然失敗，大伯對小叔的【敵意】還是上升了。今晚的耳語可能會很精彩。' },
+      ] },
+      { label: '離開', seq: () => [] },
+    ] },
+  ];
+}
+const actor = id => actors.find(a => a.id === id);
+
+// ================= 把柄／地圖／提示 =================
+const toastEl = document.getElementById('toast'); let toastT;
+function toast(s) { toastEl.textContent = s; toastEl.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => toastEl.classList.remove('show'), 2400); }
+function gainCard(c) { S.cards.push(c); toast(`📁 獲得把柄：${c.who} — ${c.what}`); }
+
+const mapPanel = document.getElementById('mapPanel'), cardPanel = document.getElementById('cardPanel');
+document.querySelectorAll('[data-close]').forEach(b => b.onclick = () => b.parentElement.style.display = 'none');
+document.getElementById('btnCards').onclick = () => {
+  const L = document.getElementById('cardList');
+  L.innerHTML = S.cards.length ? S.cards.map(c => `<div class="card"><span class="lv">【${c.lv}】</span><span class="who">${c.who}</span>　${c.what}</div>`).join('')
+    : '<div class="empty">還沒有任何把柄。去找人套話吧。</div>';
+  cardPanel.style.display = 'block';
+};
+const thumb = id => portrait(id, 'normal').src;
+const ROOMS = [
+  { id: 'study', name: '書房', here: true, who: [['kui', '小葵'], ['uncle', '大伯']] },
+  { id: 'hall', name: '靈堂', who: [[null, '二姑（秋姨說的）'], [null, '芊芊 📱 直播中']] },
+  { id: 'kitchen', name: '廚房', who: [[null, '秋姨']] },
+  { id: 'living', name: '客廳', who: [[null, '？']] },
+  { id: 'garage', name: '車庫', who: [[null, '？']] },
+];
+document.getElementById('btnMap').onclick = () => {
+  const G = document.getElementById('mapgrid');
+  G.innerHTML = ROOMS.map(r => `<div class="room ${r.here ? 'here' : ''}" style="grid-area:${r.id}" data-room="${r.id}"><h3>${r.name}</h3>` +
+    r.who.map(([id, n]) => id ? `<span class="chip"><img src="${thumb(id)}">${n}</span>` : `<span class="chip unk">${n}</span>`).join('') + '</div>').join('');
+  G.querySelectorAll('.room').forEach(el => el.onclick = () => {
+    mapPanel.style.display = 'none';
+    if (el.dataset.room !== 'study') toast('（樣式原型只畫了書房）');
+  });
+  mapPanel.style.display = 'block';
+};
+
+// 開場：等美術資源載入完成
+assetsReady.then(() => {
+  for (const a of actors) a.spr = nightTint(IMG[a.id + '_chibi']);
+  requestAnimationFrame(frame);
+  // 測試用：#explore 跳過開場、#kui / #uncle 直接進對話
+  const h = location.hash.slice(1);
+  if (h === 'explore') return;
+  if (h === 'kui' || h === 'uncle') return run(actor(h).talk());
+  run([
+  { t: '第 2 天・晚上。\n靈堂的誦經聲停了。你趁大家不注意，溜進了老爺的書房……' },
+  { sys: 1, t: '（點擊房間裡的人物互動。右上角可以打開把柄筆記和地圖。）' },
+  ]);
+}).catch(src => { document.body.insertAdjacentHTML('beforeend', `<p style="position:fixed;top:8px;left:8px;color:#f88">載入失敗：${src}（請用 http://localhost/ 開啟）</p>`); });
+</script>
+</body>
+</html>

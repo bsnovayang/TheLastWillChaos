@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>角色陣容</title>
+<style>
+  body { margin: 0; background: #14141b; color: #e8e4f2; font: 14px/1.6 "Microsoft JhengHei", sans-serif; padding: 16px; }
+  h2 { font-size: 15px; margin: 16px 0 6px; }
+  canvas { image-rendering: pixelated; display: block; border-radius: 6px; max-width: 100%; }
+  .muted { color: #9b97ad; font-size: 13px; }
+</style>
+</head>
+<body>
+  <h2>角色陣容（放大 ×6，待機動畫：呼吸、後髮飄、眨眼）</h2>
+  <canvas id="line"></canvas>
+  <h2>放進書房（場景 ×3，遊戲實際比例）</h2>
+  <canvas id="room"></canvas>
+  <div class="muted">場景 320×180、角色 48px。對照用：書桌高約 32px。</div>
+<script src="src/sprite48.js"></script>
+<script src="src/chars/kit.js"></script>
+<script src="src/chars/kui.js"></script>
+<script src="src/chars/qiu.js"></script>
+<script src="src/chars/uncle.js"></script>
+<script src="src/chars/ergu.js"></script>
+<script src="src/chars/junjie.js"></script>
+<script src="src/chars/qianqian.js"></script>
+<script>
+'use strict';
+const ORDER = ['uncle', 'ergu', 'junjie', 'qianqian', 'qiu', 'kui'];
+const list = ORDER.filter(id => window.CHARS && CHARS[id]).map(id => ({ id, spec: CHARS[id], frames: Sprite48.idle(CHARS[id]) }));
+
+const Z = 6, CW = 34, CH = 58, GAP = 6;
+const line = document.getElementById('line'), lg = line.getContext('2d');
+line.width = list.length * (CW + GAP) * Z; line.height = (CH + 10) * Z;
+
+const RZ = 3;
+const room = document.getElementById('room'), rg = room.getContext('2d');
+room.width = 320 * RZ; room.height = 180 * RZ;
+const study = new Image(); study.src = 'assets/scenes/study.png';
+// 每個人在書房裡的位置（腳底）
+const SPOT = { uncle: [282, 160], ergu: [212, 168], junjie: [150, 172], qianqian: [100, 166], qiu: [18, 160], kui: [56, 170] };
+
+let t = 0;
+function tick() {
+  lg.imageSmoothingEnabled = false; rg.imageSmoothingEnabled = false;
+  lg.fillStyle = '#2c2c38'; lg.fillRect(0, 0, line.width, line.height);
+  list.forEach(({ spec, frames }, i) => {
+    const f = frames[(t + i * 3) % 16], ox = i * (CW + GAP) * Z;
+    lg.drawImage(f, ox, 0, CW * Z, CH * Z);
+    lg.fillStyle = '#e8e4f2'; lg.font = `${4 * Z}px "Microsoft JhengHei"`; lg.textAlign = 'center';
+    lg.fillText(spec.name, ox + CW * Z / 2, (CH + 7) * Z);
+  });
+  if (study.complete) {
+    rg.drawImage(study, 0, 0, room.width, room.height);
+    list.slice().sort((a, b) => SPOT[a.id][1] - SPOT[b.id][1]).forEach(({ id, spec, frames }, i) => {
+      const [px, py] = SPOT[id], f = frames[(t + i * 5) % 16];
+      rg.fillStyle = 'rgba(0,0,0,.35)'; rg.fillRect((px - 8) * RZ, py * RZ, 16 * RZ, 2 * RZ);
+      rg.drawImage(f, (px - spec.gx) * RZ, (py - spec.gy) * RZ, CW * RZ, CH * RZ);
+    });
+  }
+  t++;
+}
+tick(); setInterval(tick, 125);
+</script>
+</body>
+</html>

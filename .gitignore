@@ -1,0 +1,7 @@
+# pxl 的預覽輸出（只在美術開發時用）
+art/out/
+
+# 系統檔
+.DS_Store
+Thumbs.db
+desktop.ini
