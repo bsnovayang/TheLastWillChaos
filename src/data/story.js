@@ -128,6 +128,23 @@ const CASES = [
         S.log.push('大伯認定是小叔開了保險箱，追著他繞了豪宅三圈。');
       }
     } },
+  { id: 'carKey', title: '車庫的鑰匙不見了', victim: 'qiu',
+    open: (S) => S.seen.key_missing && S.items.carKey,
+    suspects: { junjie: ['他一直想跑路', 2], kui: ['她負責打掃車庫', 1], qianqian: ['她說想拍古董車', 0] },
+    say: ['車鑰匙啊……我看到{B}在車庫晃來晃去。', '{B}前天還在問，那台車還能不能開。'],
+    done: (S, b) => { S.chars.qiu.hate[b] = (S.chars.qiu.hate[b] || 0) + 2;
+      S.log.push({ junjie: '秋姨認定是小叔拿了車鑰匙，把他的房門從外面鎖了一整晚。', kui: '秋姨把小葵叫去問了一個下午。小葵哭著說她只是去餵孔雀。', qianqian: '秋姨沒收了芊芊的自拍棒，說等鑰匙找到再還她。' }[b]); } },
+  // 不是你做的：二姑的假古董被拆穿之後，說是別人調包的（替二姑解圍）
+  { id: 'antique', title: '客廳的古董是假貨', victim: null, mine: false, noTell: ['ergu'],
+    note: '這件不是你做的・替二姑解圍',
+    open: (S) => S.seen.d4_stream,
+    suspects: { junjie: ['他缺錢缺瘋了', 2], uncle: ['家裡的帳都是他在管', 1] },
+    say: ['花瓶的事……我覺得不是二姑。我看過{B}半夜搬東西出門。', '二姑是被冤枉的。真的花瓶，是{B}拿去賣的。'],
+    done: (S, b, notes) => {
+      S.chars.ergu.hostile = Math.max(0, S.chars.ergu.hostile - 2); S.flags.erguCovered = true;
+      S.log.push(`大家開始懷疑，花瓶其實是${name(b)}調包的。二姑終於敢走出房間了。`);
+      notes.push(SYS('二姑欠你一次。（二姑敵意 −2）'));
+    } },
   { id: 'peacock', title: '孔雀被放出來', victim: 'junjie',
     open: (S) => S.flags.peacockReleased,
     suspects: { qianqian: ['她拍了孔雀大鬧靈堂的影片', 2], kui: ['她負責打掃車庫', 0], ergu: ['她最怕鳥', -2] },
@@ -430,7 +447,7 @@ const CMD_HELP = {
   sow: '讓他討厭另一個人。可能引發吵架、改變他之後的行動。說得出對方把柄的細節會更容易。',
   bribe: '花錢換情報或立場。不是每個人都收錢。',
   expose: '把別人真正做過的事告訴他（要有那個人的線索或實證）。說的是實話，不算說謊。被告發的人會當眾出糗，有實證的話秘密會被揭穿。',
-  frame: '把家裡出的事（通常是你幹的）栽到別人頭上。先選案子，再選要說是誰；對方越有動機越可信。成功：嫌疑轉走、可疑度 −1。失敗：嫌疑回到你身上。不管成不成功，都算說了一次謊。',
+  frame: '把家裡出的事（通常是你幹的）栽到別人頭上。先選案子，再選要說是誰；對方越有動機越可信。成功：嫌疑轉走、可疑度 −1。失敗：嫌疑回到你身上。被拆穿、或秋姨聽得到（她在場、跟她說、跟小葵說）的話，算你說了一次謊。',
   befriend: '拉近關係。深交到某個程度，會知道他的另一面，也可能拿到關鍵道具。',
   blackmail: '拿實證逼他就範。每個人能給的東西不一樣，但都會讓他對你有敵意；如果你們已經交心，這就是背叛。',
   leave: '結束對話。不花時間。',
@@ -672,7 +689,7 @@ const HOTSPOTS = {
     { id: 'key', name: '牆上的車鑰匙', x: 281, y: 59,
       look: (S) => S.items.carKey ? [N('鉤子是空的。鑰匙在你這。')] : S.flags.keyStolen ? [N('鉤子是空的。有人先拿走了。')] : [N('古董車的鑰匙就掛在鉤子上。')],
       act: { label: '拿走車鑰匙', can: (S) => !S.items.carKey && !S.flags.keyStolen,
-        run: (S, notes) => { S.items.carKey = true; notes.push(SYS(W.got('carKey'))); return [N('你把鑰匙收進口袋。')]; } } },
+        run: (S, notes) => { S.items.carKey = true; S.flags.keyTakenAt = Engine.slotIdx(S); notes.push(SYS(W.got('carKey'))); return [N('你把鑰匙收進口袋。')]; } } },
     { id: 'cage', name: '蓋著帆布的籠子', x: 51, y: 104,
       look: (S) => {
         if (S.flags.peacockReleased) return [N('籠子是空的。地上只剩幾根羽毛。')];
@@ -827,6 +844,8 @@ function condolenceFallout(S) {
 }
 
 const TURNS = [
+  { id: 'key_missing', if: (S) => S.items.carKey && S.flags.keyTakenAt !== undefined && Engine.slotIdx(S) > S.flags.keyTakenAt,
+    run: () => ({ whisper: '（秋姨）車庫的鑰匙不見了。老爺的車，誰都不准動。' }) },
   { id: 'safe_found', if: (S) => S.flags.safeOpened, run: () => ({ whisper: '書房的保險箱被打開了，裡面空了。大伯在書房吼了一整個下午。' }) },
   { id: 'pudding_gone', if: (S) => S.flags.puddingAlone, run: () => ({}) },   // 群組訊息在 group.js
   { id: 'qiu_photo', if: (S) => S.chars.qiu.bond >= 2 && S.room === 'kitchen' && S.slot === 2 && S.chars.qiu.loc === 'kitchen', run: (S) => {

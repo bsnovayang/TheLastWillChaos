@@ -219,7 +219,8 @@ function resolve(S, cmd, t, extra, out) {
     }
     case 'frame': {    // 嫁禍：一定算說謊
       const K = STORY.CASES.find(k => k.id === ctx.case), B = W.CHARS[ctx.b].name;
-      S.lies++;
+      // 說謊會被秋姨記住：被拆穿、她在場、直接跟她說、或跟藏不住話的小葵說
+      if (out === 'f' || t === 'qiu' || t === 'kui' || others.includes('qiu')) { S.lies++; notes.push({ sys: 1, t: '🤥 秋姨會知道你說了謊。' }); }
       if (out === 'f') {
         S.exposure += 2; ch.hostile += 2; S.flags['case_' + K.id] = 'me';
         if (K.victim && K.victim !== t) S.chars[K.victim].hostile += 2;
@@ -282,7 +283,7 @@ function caseSuspects(S, kid, t) {
   return Object.keys(sus).filter(b => b !== t && !S.chars[b].gone).map(b => ({ b, part: sus[b] }));
 }
 // 還沒結案、可以拿來嫁禍的案子
-const openCases = (S, t) => STORY.CASES.filter(K => !S.flags['case_' + K.id] && K.open(S) && caseSuspects(S, K.id, t).length);
+const openCases = (S, t) => STORY.CASES.filter(K => !S.flags['case_' + K.id] && !(K.noTell || []).includes(t) && K.open(S) && caseSuspects(S, K.id, t).length);
 
 // 深交階段的效果
 function onBond(S, t, stage, notes) {
