@@ -115,11 +115,22 @@ function odds(S, cmd, t, extra = {}) {
       if (t === 'junjie' && S.chars.junjie.motive === '恐懼') parts.push(['急著要錢', 2]);
       if (t === 'ergu') parts.push(['她其實破產了', 1]);
       break;
-    case 'frame':
+    case 'expose': {   // 告發：說實話，靠學識或道德說服
+      const k = best('know', 'moral'); stat = P[k]; statLabel = W.STATS[k];
+      resist = T.stats.guile; resistLabel = `${T.name}的城府`;
+      if (lvl(S, extra.sid) >= 3) parts.push(['拿得出實證', 3]); else parts.push(['有線索佐證', 1]);
+      if ((S.chars[t].hate[b] || 0) > 0) parts.push(['本來就看不順眼', 1]);
+      break;
+    }
+    case 'frame': {    // 嫁禍：說謊，靠城府
       stat = P.guile; statLabel = '城府'; resist = T.stats.know; resistLabel = `${T.name}的學識`;
-      if (maxCard(S, b) >= 3) parts.push(['拿得出實證', 3]); else if (maxCard(S, b) >= 2) parts.push(['有線索佐證', 1]);
+      const sus = caseSuspects(S, extra.case, t).find(x => x.b === b);
+      if (sus && sus.part[1]) parts.push(sus.part);
+      const K = STORY.CASES.find(k => k.id === extra.case), w = K && K.witness && K.witness(S);
+      if (w) parts.push(w);
       if ((S.chars[t].hate[b] || 0) > 0) parts.push(['本來就懷疑他', 1]);
       break;
+    }
     case 'befriend': {
       const bf = T.befriend; stat = P[bf.stat]; statLabel = W.STATS[bf.stat];
       resist = bf.resist; resistLabel = `${T.name}的心防`;
@@ -154,7 +165,7 @@ const roll = (o) => { const r = Math.random(); return r < o.s ? 's' : r < o.s + 
 // 回傳 { lines }：先是角色的反應（STORY），再是系統提示
 function resolve(S, cmd, t, extra, out) {
   const ch = S.chars[t], T = W.CHARS[t], notes = [];
-  const ctx = { t, b: extra.b, opt: extra.opt, out, stage: 0, gainSid: null };
+  const ctx = { t, b: extra.b, opt: extra.opt, case: extra.case, sid: extra.sid, out, stage: 0, gainSid: null };
   const others = present(S).filter(id => id !== t);
   switch (cmd) {
     case 'probe':
@@ -196,14 +207,38 @@ function resolve(S, cmd, t, extra, out) {
       if (out === 'm') { S.chars.uncle.hostile++; S.log.push(`${T.name}到處跟人說你給了他錢，大伯聽到了。`); notes.push({ sys: 1, t: `⚠ 出包：${T.name}到處張揚你給了他錢。（大伯敵意 +1）` }); }
       break;
     }
-    case 'frame':
-      if (out === 'f') { S.exposure += 2; ch.hostile += 2; S.lies++; break; }
+    case 'expose': {   // 告發：說的是實話，不算說謊
+      const B = W.CHARS[ctx.b].name;
+      if (out === 'f') { S.exposure++; ch.hostile++; notes.push({ sys: 1, t: `${T.name}不想聽你講別人的閒話。（${T.name}敵意 +1、可疑度 +1）` }); break; }
       ch.hate[ctx.b] = (ch.hate[ctx.b] || 0) + 3;
       addState(S, ctx.b, '狼狽');
-      if (maxCard(S, ctx.b) >= 3 || t === 'qianqian') S.chars[ctx.b].exposed = true;
-      if (others.includes('qiu')) S.lies++;
-      S.log.push(`${W.CHARS[ctx.b].name}被${T.name}當眾質問，場面很難看。`);
+      if (lvl(S, ctx.sid) >= 3 || t === 'qianqian') { S.chars[ctx.b].exposed = true; notes.push({ sys: 1, t: `📢 ${B}「${W.SECRETS[ctx.sid].title}」的事被揭穿了。` }); }
+      S.log.push(`${B}被${T.name}當眾質問「${W.SECRETS[ctx.sid].title}」的事，場面很難看。`);
       if (out === 'm') { S.exposure++; notes.push({ sys: 1, t: '⚠ 出包：有人注意到是你在背後放話。（可疑度 +1）' }); }
+      break;
+    }
+    case 'frame': {    // 嫁禍：一定算說謊
+      const K = STORY.CASES.find(k => k.id === ctx.case), B = W.CHARS[ctx.b].name;
+      S.lies++;
+      if (out === 'f') {
+        S.exposure += 2; ch.hostile += 2; S.flags['case_' + K.id] = 'me';
+        if (K.victim && K.victim !== t) S.chars[K.victim].hostile += 2;
+        notes.push({ sys: 1, t: `⚠ ${T.name}不信。「${K.title}」的嫌疑，現在落到你頭上了。（可疑度 +2）` });
+        break;
+      }
+      S.flags['case_' + K.id] = ctx.b;
+      ch.hate[ctx.b] = (ch.hate[ctx.b] || 0) + 2;
+      addState(S, ctx.b, '狼狽');
+      if (t === 'qianqian' || t === 'kui') {   // 芊芊開直播、小葵到處講：全家都知道
+        RELATIVES.filter(o => o !== ctx.b && o !== t).forEach(o => { S.chars[o].hate[ctx.b] = (S.chars[o].hate[ctx.b] || 0) + 1; });
+        notes.push({ sys: 1, t: t === 'qianqian' ? '📹 芊芊開了直播，全家都知道了。' : '📢 小葵到處講，全家都知道了。' });
+      }
+      K.done(S, ctx.b, notes);
+      notes.push({ sys: 1, t: `🕵 「${K.title}」→ 大家認定是${B}做的。` });
+      if (out === 's') { if (S.exposure > 0) { S.exposure--; notes.push({ sys: 1, t: '嫌疑轉走了。（可疑度 −1）' }); } }
+      else { S.exposure++; notes.push({ sys: 1, t: `⚠ 出包：${T.name}覺得你知道得太清楚了。（可疑度 +1）` }); }
+      break;
+    }
       break;
     case 'befriend':
       if (out !== 'f') {
@@ -231,6 +266,23 @@ function resolve(S, cmd, t, extra, out) {
   const lines = STORY.cmd(cmd, S, ctx);
   return { lines: lines.concat(notes) };
 }
+
+// ---------------------------------------------------------------- 告發、嫁禍的選項
+const RELATIVES = ['uncle', 'ergu', 'junjie', 'qianqian'];
+// 告發：你手上有線索或實證的秘密（不能告發對方自己）
+function exposeOptions(S, t) {
+  return Object.keys(W.SECRETS).filter(sid => { const w = W.SECRETS[sid].who; return w !== t && !S.chars[w].gone && lvl(S, sid) >= 2; })
+    .map(sid => ({ sid, who: W.SECRETS[sid].who, lv: lvl(S, sid) }));
+}
+// 嫁禍：這件案子可以栽給誰（不能栽給聽的人自己）
+function caseSuspects(S, kid, t) {
+  const K = STORY.CASES.find(k => k.id === kid);
+  if (!K) return [];
+  const sus = typeof K.suspects === 'function' ? K.suspects(S) : K.suspects;
+  return Object.keys(sus).filter(b => b !== t && !S.chars[b].gone).map(b => ({ b, part: sus[b] }));
+}
+// 還沒結案、可以拿來嫁禍的案子
+const openCases = (S, t) => STORY.CASES.filter(K => !S.flags['case_' + K.id] && K.open(S) && caseSuspects(S, K.id, t).length);
 
 // 深交階段的效果
 function onBond(S, t, stage, notes) {
@@ -289,7 +341,7 @@ const DRINKERS = ['uncle', 'ergu', 'junjie', 'qianqian'];
 const canDrink = (S, id) => S.items.liquor && DRINKERS.includes(id) && !has(S, id, '醉酒');
 function drink(S, id) {
   S.items.liquor = false; addState(S, id, '醉酒');
-  return STORY.DRINK[id].concat([{ sys: 1, t: `🍶 ${W.CHARS[id].name}喝醉了：這個時段內，試探、挑撥、嫁禍、勒索他都更容易。` }]);
+  return STORY.DRINK[id].concat([{ sys: 1, t: `🍶 ${W.CHARS[id].name}喝醉了：這個時段內，試探、挑撥、告發、嫁禍、勒索他都更容易。` }]);
 }
 
 // ================================================================ 隨機小插曲（進房間時有機率發生，每段只發生一次）
@@ -449,6 +501,6 @@ const fmt = (n) => (Math.round(n * 10) / 10).toString();
 return {
   newGame, slotLabel, has, addState, delState, setMotive, present, locate,
   lvl, maxCard, raise, gossip, proofCount,
-  post, groupReplies, groupSend, canDrink, drink, interlude, slotIdx, odds, roll, resolve, doAct, persuade, specialsFor, special, prereadOptions, preread, addBond, endSlot, endingAvail, readingOptions, canEscape, kuiWilling, escapeWay, unlockGoal, slotsLeft, lawyerTrust, fiasco, fmt,
+  post, groupReplies, groupSend, canDrink, drink, interlude, slotIdx, odds, roll, resolve, doAct, persuade, specialsFor, special, prereadOptions, preread, addBond, exposeOptions, caseSuspects, openCases, endSlot, endingAvail, readingOptions, canEscape, kuiWilling, escapeWay, unlockGoal, slotsLeft, lawyerTrust, fiasco, fmt,
 };
 })();

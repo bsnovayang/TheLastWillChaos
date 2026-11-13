@@ -102,6 +102,14 @@ const ON = {
     ['qiu', '那是小葵的。'],
     ['sys', '已讀 5'],
   ],
+  safe_found: [
+    ['uncle', '書房的保險箱 誰開的'],
+    ['junjie', '不是我！！'],
+    ['ergu', '保險箱？爸有保險箱？'],
+    ['qianqian', '裡面有什麼'],
+    ['uncle', '沒什麼'],
+    ['sys', '秋姨 已讀'],
+  ],
   qiu_despair: [
     ['qiu', '明天的早餐，請各位自理。'],
     ['junjie', '秋姨？？'],
@@ -173,7 +181,7 @@ const REPLIES = [
     fx: (S) => { S.flags.puddingLied = true; S.chars.kui.hostile++; return '秋姨沒有再追問。……小葵被唸了一頓（小葵敵意 +1）。'; } },
   { on: 'pudding_gone', when: (S) => !S.chars.junjie.gone, label: '「應該是小叔吧」', stat: 'guile', min: 4, msg: '應該是小叔吧 他最愛吃甜的',
     replies: [['junjie', '？？？？？'], ['uncle', '俊傑'], ['ergu', '俊傑你幾歲了'], ['junjie', '不是我啦！！！！']],
-    fx: (S) => { S.chars.junjie.hostile++; S.lies++; return '大家都信了。小叔百口莫辯（小叔敵意 +1）。……你又說了一個謊。'; } },
+    fx: (S) => { S.chars.junjie.hostile++; S.lies++; S.flags.case_pudding = 'junjie'; return '大家都信了。小叔百口莫辯（小叔敵意 +1）。……你又說了一個謊。'; } },
   { on: 'd5_crash', label: '「R.I.P. 大門柱子」', msg: 'R.I.P. 大門柱子 🕯️', replies: [['qianqian', '哈哈哈哈哈哈'], ['junjie', '你們好過分']], fx: (S) => { relax(S, 'qianqian'); return '芊芊笑了。'; } },
 
   { on: 'any', label: '（已讀不回）', msg: null, replies: [], fx: () => null },

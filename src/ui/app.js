@@ -215,7 +215,7 @@ $('#btnCards').onclick = () => {
     const sc = W.SECRETS[sid];
     return `<div class="card lv${lv}"><span class="lv">【${W.LEVEL[lv]}】</span><b>${W.CHARS[sc.who].name}</b>　${sc.title}</div>`;
   }).join('') || '<div class="empty">還沒有任何把柄。去找人套話，或調查房間裡的東西。</div>';
-  openPanel('cardPanel', `${cards}<div class="hint">傳聞：只能拿來挑撥　線索：試探更容易成功　實證：可以勒索、嫁禍、公開<br>拿到的東西在 🎒 道具。</div>`);
+  openPanel('cardPanel', `${cards}<div class="hint">傳聞：只能拿來挑撥　線索：可以告發　實證：可以告發、勒索、在宣讀時公開<br>拿到的東西在 🎒 道具。</div>`);
 };
 $('#btnGoal').onclick = () => {
   const html = STORY.goals(S).map(g => `<div class="goal ${g.late ? 'late' : ''}"><h3>${g.title}${g.late ? '<em>（……也許已經太遲了）</em>' : ''}</h3><p>${g.desc}</p>${g.steps.map(t => `<div class="gstep">${t}</div>`).join('')}</div>`).join('')
@@ -366,7 +366,7 @@ function clearSave() { try { localStorage.removeItem(SAVE_KEY); } catch (e) {} }
 function loadSave() { try { const t = localStorage.getItem(SAVE_KEY); return t ? JSON.parse(t) : null; } catch (e) { return null; } }
 
 // ================================================================ 互動：人物
-const CMD_NAME = { probe: '試探', sow: '挑撥', bribe: '賄賂', frame: '嫁禍', befriend: '示好', blackmail: '勒索' };
+const CMD_NAME = { probe: '試探', sow: '挑撥', bribe: '賄賂', expose: '告發', frame: '嫁禍', befriend: '示好', blackmail: '勒索' };
 const RELATIVES = ['uncle', 'ergu', 'junjie', 'qianqian'];
 const pct = (p) => Math.round(p * 100) + '%';
 const oddsSub = (o) => (o.sure ? '✔ 穩贏' : `成功 ${pct(o.s)}`);
@@ -379,9 +379,15 @@ function talkOptions(id) {
   const T = W.CHARS[id], opts = [];
   const more = STORY.hasChat(S, id);
   opts.push({ label: '【閒聊】', sub: '不花時間', value: { c: 'chat' }, tip: H.chat });
-  if (Engine.canDrink(S, id)) opts.push({ label: '【灌醉】請他喝一杯', sub: '不花時間・用掉高粱酒', value: { c: 'drink' }, tip: '他喝醉之後，這個時段內試探、挑撥、嫁禍、勒索都更容易成功。先灌醉，再下指令。' });
-  for (const c of ['probe', 'sow', 'frame', 'befriend']) {
-    const needB = c === 'sow' || c === 'frame';
+  if (Engine.canDrink(S, id)) opts.push({ label: '【灌醉】請他喝一杯', sub: '不花時間・用掉高粱酒', value: { c: 'drink' }, tip: '他喝醉之後，這個時段內試探、挑撥、告發、嫁禍、勒索都更容易成功。先灌醉，再下指令。' });
+  for (const c of ['probe', 'sow', 'expose', 'frame', 'befriend']) {
+    if (c === 'expose' || c === 'frame') {
+      const n = c === 'expose' ? Engine.exposeOptions(S, id).length : Engine.openCases(S, id).length;
+      opts.push({ label: `【${CMD_NAME[c]}】`, sub: n ? (c === 'expose' ? '選擇要說誰的事' : `家裡有 ${n} 件事可以栽贓`) : (c === 'expose' ? '需要別人的線索或實證' : '家裡還沒出什麼事'),
+        disabled: !n, value: n ? { c } : null, tip: H[c] + NL + '出包＝' + STORY.MISHAP[c] });
+      continue;
+    }
+    const needB = c === 'sow';
     const o = needB ? null : Engine.odds(S, c, id);
     opts.push({ label: `【${CMD_NAME[c]}】`, sub: needB ? '選擇對象' : oddsSub(o), value: { c }, tip: H[c] + (o ? NL + oddsDetail(o) : '') + (o && o.m > 0 ? NL + '出包＝' + STORY.MISHAP[c] : '') });
   }
@@ -434,13 +440,37 @@ async function talk(id) {
     if (tid === '_random') { await say(STORY.chat(S, id).lines); await flushMoments(); }
     else if (tid) await say(DIALOGUE.askTopic(S, id, tid));
   }
-  if (v && (v.c === 'sow' || v.c === 'frame')) {
+  if (v && v.c === 'expose') {
+    const list = Engine.exposeOptions(S, id).map(x => {
+      const o = Engine.odds(S, 'expose', id, { b: x.who, sid: x.sid });
+      return { label: `${W.CHARS[x.who].name}：${W.SECRETS[x.sid].title}`, sub: `${W.LEVEL[x.lv]}・${oddsSub(o)}`, value: x, tip: oddsDetail(o) };
+    });
+    list.push({ label: '算了', value: null });
+    const x = await choose(list, `要跟${T.name}說誰的事？`);
+    v = x ? { ...v, b: x.who, sid: x.sid } : null;
+  }
+  if (v && v.c === 'frame') {
+    const cs = Engine.openCases(S, id).map(K => ({ label: K.title, sub: K.note || '', value: K.id }));
+    cs.push({ label: '算了', value: null });
+    const k = await choose(cs, `要跟${T.name}說哪件事？`);
+    let b = null;
+    if (k) {
+      const ts = Engine.caseSuspects(S, k, id).map(x => {
+        const o = Engine.odds(S, 'frame', id, { b: x.b, case: k });
+        return { label: W.CHARS[x.b].name, sub: oddsSub(o) + `｜${x.part[0]}`, value: x.b, tip: oddsDetail(o) };
+      });
+      ts.push({ label: '算了', value: null });
+      b = await choose(ts, `要說「${STORY.CASES.find(K => K.id === k).title}」是誰做的？`);
+    }
+    v = b ? { ...v, case: k, b } : null;
+  }
+  if (v && v.c === 'sow') {
     const targets = RELATIVES.filter(r => r !== id && !S.chars[r].gone).map(b => {
       const o = Engine.odds(S, v.c, id, { b });
       return { label: W.CHARS[b].name, sub: oddsSub(o) + (Engine.maxCard(S, b) ? `・把柄：${W.LEVEL[Engine.maxCard(S, b)]}` : ''), value: b, tip: oddsDetail(o) };
     });
     targets.push({ label: '算了', value: null });
-    const b = await choose(targets, v.c === 'sow' ? `要讓${T.name}討厭誰？` : `要把罪名栽到誰頭上？`);
+    const b = await choose(targets, `要讓${T.name}討厭誰？`);
     v = b ? { ...v, b } : null;
   }
   if (!v) { close(); busy = false; return; }
@@ -721,11 +751,15 @@ async function boot() {
     if (location.search.includes('changed')) Object.assign(S.flags, { safeOpened: 1, vaseHandled: 1, soldAntique: 1, peacockReleased: 1, carWrecked: 1 }), S.items.carKey = 1, S.items.liquor = 1;
     $('#hud').style.display = 'flex'; hud();
   }
-  if (['quick', 'talk', 'wheel', 'map', 'goal', 'phone', 'items'].includes(h)) {
+  if (['quick', 'talk', 'frame', 'wheel', 'map', 'goal', 'phone', 'items'].includes(h)) {
     $('#title').style.display = 'none';
     S = Engine.newGame({ moral: 3, know: 3, guile: 3, charm: 3 }); S.money += W.MONEY.allowance;
     $('#hud').style.display = 'flex'; hud();
     if (h === 'talk') talk('uncle');
+    if (h === 'frame') {   // 告發、嫁禍：案子全開，手上有把柄
+      Object.assign(S.flags, { tookCondolence: 1, condolenceDay: 1, peacockReleased: 1 }); Object.assign(S.seen, { uncle_rush: 1, safe_found: 1, pudding_gone: 1 });
+      Object.assign(S.cards, { ergu_antique: 3, junjie_loan: 2 }); talk('uncle');
+    }
     if (h === 'map') $('#btnMap').onclick();
     if (h === 'items') { Object.assign(S.items, { liquor: 1, necklace: 1, page: 1, carKey: 1 }); S.flags.sawPeacock = 1; $('#btnItems').onclick(); }
     if (h === 'phone') { S.flags.tookCondolence = 1; S.flags.condolenceDay = 2; while (!(S.day === 4 && S.slot === 1)) Engine.endSlot(S); hud(); openPhone(); }

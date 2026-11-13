@@ -84,6 +84,58 @@ const ARRIVE = [
   SYS('點人物可以對話、下指令；點 ✦ 可以調查物件。\n下指令或「動手」調查會花掉一個時段，移動、閒聊和看東西不花時間。\n右上角「🎯 目標」可以看你現在想要什麼、離它還有多遠。'),
 ];
 
+// ================================================================ 家裡的案子（嫁禍用）
+// 家裡出了事、大家開始追究，案子才會出現；一件案子只能栽一次（S.flags['case_' + id] = 被栽的人，失敗是 'me'）
+// suspects：可以栽給誰、可信度加成；victim：栽失敗時，誰會記恨你；say：你說的話（{B} 換成被栽的人）
+const CASES = [
+  { id: 'condolence', title: '白包被偷', victim: null,
+    note: '明天就會爆開',
+    open: (S) => S.flags.tookCondolence && !S.seen.condolence,
+    suspects: { junjie: ['他欠了一屁股債', 2], ergu: ['聽說她破產了', 1], qianqian: ['她不缺錢', -1] },
+    witness: (S) => (S.flags.condolenceSeen ? ['有人看到你在靈堂附近', -2] : null),
+    say: ['白包的事……我昨晚看到{B}一個人在靈堂待了很久。', '奠儀簿少一包的那天，{B}剛好一直說手頭很緊。'],
+    done: (S, b, notes) => notes.push(SYS(`🕯 明天白包的事爆開時，大家會懷疑${name(b)}。`)) },
+  { id: 'pudding', title: '冰箱的布丁被偷吃', victim: 'qiu',
+    open: (S) => S.seen.pudding_gone && !S.flags.puddingConfessed,
+    suspects: (S) => ({ junjie: S.flags.puddingJunjie ? ['他真的吃了一半', 3] : ['他最愛吃甜的', 2], ergu: ['她半夜會偷吃宵夜', 1],
+      qianqian: ['她說她在減肥', -1], uncle: ['大伯不吃甜的', -2] }),
+    say: ['布丁啊……我看到{B}在冰箱前面鬼鬼祟祟的。', '{B}的嘴角，剛剛還沾著焦糖。'],
+    done: (S, b, notes) => {
+      S.log.push({ junjie: '秋姨罰小叔洗了一整晚的碗。他一邊洗一邊喊冤。', ergu: '二姑被冤枉偷吃布丁，在群組連發了三張長輩圖。',
+        qianqian: '芊芊被秋姨唸了半小時「減肥還偷吃」。她說要告你誹謗。', uncle: '大伯被秋姨用看垃圾的眼神，看了一整頓晚餐。' }[b]);
+      if (S.flags.puddingLied && !S.flags.puddingForgiven) { S.flags.puddingForgiven = true; S.chars.kui.hostile = Math.max(0, S.chars.kui.hostile - 1); notes.push(SYS('小葵的冤屈洗清了。（小葵敵意 −1）')); }
+    } },
+  { id: 'page', title: '帳本被撕了一頁', victim: 'uncle',
+    open: (S) => S.seen.uncle_rush,
+    suspects: { ergu: ['她也想抓大伯的把柄', 2], qianqian: ['她最愛挖八卦', 1], junjie: ['他看不懂帳本', -1] },
+    say: ['帳本那一頁……我看到{B}從書房出來，手上拿著一張紙。', '書房的事，您去問{B}吧。那天只有{B}進去過。'],
+    done: (S, b) => { S.chars.uncle.hate[b] = (S.chars.uncle.hate[b] || 0) + 3; S.log.push(`大伯認定是${name(b)}偷了帳本那一頁，兩個人在書房吵翻了。`); } },
+  { id: 'safe', title: '保險箱被打開', victim: 'uncle',
+    open: (S) => S.seen.safe_found,
+    suspects: (S) => ({ uncle: ['他一直在找鑰匙', 2], junjie: ['他急著要錢', 2],
+      kui: S.chars.kui.bond >= 2 ? ['項鍊在你手上，她心裡有數', -3] : ['打開它的是她的項鍊', 1] }),
+    say: ['保險箱的事……我半夜看到{B}在書房。', '那個保險箱的鑰匙，{B}一直很清楚在哪裡。'],
+    done: (S, b, notes) => {
+      if (b === 'kui') {
+        Engine.setMotive(S, 'kui', '察覺被利用'); S.chars.qiu.hostile += 2;
+        S.log.push('大家都說是小葵用項鍊開了保險箱。秋姨護著她，但看你的眼神變了。');
+        notes.push(SYS('💔 小葵知道是誰害她的。（秋姨敵意 +2）'));
+      } else if (b === 'uncle') {
+        ['ergu', 'junjie', 'qianqian'].forEach(o => { S.chars[o].hate.uncle = (S.chars[o].hate.uncle || 0) + 1; });
+        S.log.push('全家都認定是大伯開了保險箱。他越解釋，大家越不信。');
+      } else {
+        S.chars.uncle.hate.junjie = (S.chars.uncle.hate.junjie || 0) + 2;
+        S.log.push('大伯認定是小叔開了保險箱，追著他繞了豪宅三圈。');
+      }
+    } },
+  { id: 'peacock', title: '孔雀被放出來', victim: 'junjie',
+    open: (S) => S.flags.peacockReleased,
+    suspects: { qianqian: ['她拍了孔雀大鬧靈堂的影片', 2], kui: ['她負責打掃車庫', 0], ergu: ['她最怕鳥', -2] },
+    say: ['孔雀的事……我看到{B}在車庫附近。', '籠子被打開之前，{B}剛好從車庫走出來。'],
+    done: (S, b) => { S.chars.junjie.hate[b] = (S.chars.junjie.hate[b] || 0) + 3;
+      S.log.push(`小叔認定是${name(b)}放走了小明（孔雀），` + (b === 'qianqian' ? '說她為了流量什麼都做得出來。' : '難過得一整晚沒講話。')); } },
+];
+
 // ================================================================ 偷吃布丁（冰箱）
 function puddingRun(S, notes, v) {
   const h = Engine.present(S), relax = (id) => { S.chars[id].hostile = Math.max(0, S.chars[id].hostile - 1); };
@@ -365,7 +417,8 @@ const MISHAP = {
   probe: '拿到情報，但對方起了疑心；芊芊在場的話會被她錄下來',
   sow: '挑撥成功，但對方也開始懷疑你（敵意 +1）',
   bribe: '他收了錢，卻到處張揚',
-  frame: '嫁禍成功，但可疑度 +1',
+  expose: '他信了，但有人注意到是你在放話（可疑度 +1）',
+  frame: '栽贓成功，但他覺得你知道得太清楚（可疑度 +1）',
   befriend: '關係變好了，但旁邊的人看不順眼（敵意 +1）',
   blackmail: '只拿到一半，而且可疑度 +1',
 };
@@ -376,7 +429,8 @@ const CMD_HELP = {
   probe: '套話。成功可以拿到或升級他的把柄（傳聞 → 線索）。對小葵、秋姨試探，是打聽別人的八卦。',
   sow: '讓他討厭另一個人。可能引發吵架、改變他之後的行動。說得出對方把柄的細節會更容易。',
   bribe: '花錢換情報或立場。不是每個人都收錢。',
-  frame: '把罪名栽到別人頭上，讓那個人當眾出糗。手上有實證最有說服力；失敗會被當成騙子，可疑度大增。',
+  expose: '把別人真正做過的事告訴他（要有那個人的線索或實證）。說的是實話，不算說謊。被告發的人會當眾出糗，有實證的話秘密會被揭穿。',
+  frame: '把家裡出的事（通常是你幹的）栽到別人頭上。先選案子，再選要說是誰；對方越有動機越可信。成功：嫌疑轉走、可疑度 −1。失敗：嫌疑回到你身上。不管成不成功，都算說了一次謊。',
   befriend: '拉近關係。深交到某個程度，會知道他的另一面，也可能拿到關鍵道具。',
   blackmail: '拿實證逼他就範。每個人能給的東西不一樣，但都會讓他對你有敵意；如果你們已經交心，這就是背叛。',
   leave: '結束對話。不花時間。',
@@ -390,7 +444,7 @@ const CMD = {
   uncle: {
     probe: { s: '……你聽誰說的？那筆帳是爸生前的意思，你別亂講。', m: '（他壓低聲音）這種話，你最好別在律師面前說。', f: '年輕人，想套我的話？再修練二十年吧。' },
     sow: { s: '{B}？哼，我早就覺得他不對勁了。', m: '有意思……不過，你為什麼要告訴我這個？', f: '挑撥離間？你以為我第一天出來混？' },
-    frame: { s: '原來是{B}幹的！我這就去找他算帳！', m: '好，我會處理。……你最好也別給我惹麻煩。', f: '你拿這種東西來騙我？我會讓律師知道你是什麼樣的人。' },
+    frame: { s: '原來是{B}幹的！我這就去找{B}算帳！', m: '好，我會處理。……你最好也別給我惹麻煩。', f: '你拿這種東西來騙我？我會讓律師知道你是什麼樣的人。' },
     befriend: { s: '……你倒是比那幾個沒用的懂事。', m: '哼。（他沒拒絕，但也沒看你）', f: '少來這套。我不需要朋友。' },
     blackmail: { s: '……多少？（他從西裝內袋掏出支票本，手在抖）', m: '這是最後一次。你給我記住。', f: '你敢威脅我？我們走著瞧。' },
   },
@@ -404,7 +458,7 @@ const CMD = {
   junjie: {
     probe: { s: '你怎麼知道？……好啦好啦，我是有欠一點點錢，一點點啦！', m: '噓——你小聲一點！大哥會聽到！', f: '我？我超有錢的好嗎！這次的生意穩賺！' },
     sow: { s: '{B}說我壞話？我現在就去找他！', m: '靠，真的假的……欸，你幹嘛跟我說這個？', f: '你少騙我了，{B}才不會這樣說。……應該不會吧？' },
-    frame: { s: '是{B}？我就知道！我去揍他！', m: '好！交給我！……欸等等，你為什麼這麼清楚？', f: '欸你這樣不對喔，我雖然笨但我不是白痴。' },
+    frame: { s: '是{B}？我就知道！我去找{B}理論！', m: '好！交給我！……欸等等，你為什麼這麼清楚？', f: '欸你這樣不對喔，我雖然笨但我不是白痴。' },
     befriend: { s: '兄弟！你是這個家裡第一個正眼看我的人！', m: '哈哈哈對吧！我就說我們很合！（他講得很大聲，大家都在看）', f: '你人很好啦，可是我現在沒空。' },
     blackmail: { s: '好啦好啦！你千萬別說出去！……我、我跟你說一個大哥的秘密，跟你換！', m: '你真的很過分欸……好啦，我跟你說。但你要保密喔！', f: '你去講啊！反正我已經夠慘了！' },
   },
@@ -442,7 +496,14 @@ const GENERIC = {
 };
 function cmd(c, S, ctx) {
   const id = ctx.t, D = window.DIALOGUE;
-  const mine = D ? D.me(S, c, ctx) : null;
+  let mine = D ? D.me(S, c, ctx) : null;
+  if (c === 'frame') { const K = CASES.find(k => k.id === ctx.case); mine = { who: 'me', t: pickLine(S, 'frame:' + K.id, K.say).split('{B}').join(name(ctx.b)) }; }
+  if (c === 'expose') {
+    const X = W.SECRETS[ctx.sid].title, proof = Engine.lvl(S, ctx.sid) >= 3;
+    const pool = proof ? ['我手上有證據：{B}{X}。', '你看這個。{B}{X}，白紙黑字。'] : ['我聽說……{B}{X}。你不覺得奇怪嗎？', '這件事我還在查，但{B}好像{X}。'];
+    mine = { who: 'me', t: pickLine(S, 'expose', pool).split('{B}').join(name(ctx.b)).split('{X}').join(X) };
+  }
+  if (c === 'expose') c = 'frame';   // 對方的反應：告發和嫁禍共用（「原來是{B}幹的！」）
   const pre = mine ? [mine] : [];
   // 示好升階時只講深交台詞（不然每次都重複同一句）；已經託付之後改講 AFTER
   if (c === 'befriend' && ctx.stage) {
@@ -454,6 +515,7 @@ function cmd(c, S, ctx) {
   const t = (c !== 'bribe' && D && D.reply(S, c, ctx)) || ((book && book[ctx.out]) || '……').split('{B}').join(ctx.b ? name(ctx.b) : '');
   return pre.concat([L(id, t)], D ? D.insights(S, id, c, ctx.out, { b: ctx.b }) : []);
 }
+function pickLine(S, key, arr) { S.said = S.said || {}; const i = S.said[key] || 0; S.said[key] = i + 1; return arr[i % arr.length]; }
 function qiuHold(S, ctx) {
   return ctx.stage === 3 && ctx.t === 'qiu' && !S.items.will2 ? [L('qiu', '……我還有一樣東西要交給「配得上的人」。但現在的你，還不是。')] : [];
 }
@@ -727,12 +789,23 @@ const slotIndex = (S) => (S.day - 1) * 3 + S.slot;
 
 // 白包的後果：偷的隔天早上，秋姨清點奠儀簿。誰背鍋要看當下誰最可疑。
 function condolenceFallout(S) {
-  const c = S.chars;
-  if (S.flags.condolenceSeen)
+  const c = S.chars, pin = S.flags.case_condolence;
+  if (pin === 'qianqian') {
+    Engine.addState(S, 'qianqian', '狼狽'); S.flags.qianqianBlamed = true;
+    return { whisper: '白包少了一包。有人說是芊芊拿去當直播抽獎的獎品，她氣到當場關台。', room: 'hall',
+      scene: [L('qianqian', '我？偷白包？我一支業配就比那包多好嗎！'), L('ergu', '妳那個頻道，誰知道呢。')] };
+  }
+  if (pin === 'junjie' && c.junjie.motive !== '恐懼') {
+    Engine.addState(S, 'junjie', '狼狽'); S.flags.junjieBlamed = true;
+    c.uncle.hate.junjie = (c.uncle.hate.junjie || 0) + 1;
+    return { whisper: '白包少了一包。大伯當眾質問小叔，小叔一直說他沒拿，可是沒有人相信他。', room: 'hall',
+      scene: [L('uncle', '俊傑，是不是你？欠錢欠到連爸的白包都敢拿？'), L('junjie', '我沒有！我真的沒有！……我、我昨天是有喝一點啦……')] };
+  }
+  if (pin === 'me' || (S.flags.condolenceSeen && !pin))
     return { whisper: '（秋姨）奠儀簿少了一包。……有人跟我說，看到孫少爺在那附近。', room: 'hall',
       scene: [L('qiu', '白包少了一包。'), N('（秋姨沒有看任何人。但所有人都在看你。）')] };
   // 小叔已經借到錢、變成你的跟班 → 嫌疑落到二姑頭上（她破產的傳聞早就傳開了）
-  if (c.junjie.motive === '跟班' && c.ergu.motive !== '報復芊芊') {
+  if (pin === 'ergu' || (!pin && c.junjie.motive === '跟班' && c.ergu.motive !== '報復芊芊')) {
     Engine.addState(S, 'ergu', '狼狽'); S.flags.erguBlamed = true;
     Engine.setMotive(S, 'ergu', '報復芊芊'); S.flags.erguAngryAt = slotIndex(S);
     c.ergu.hate.qianqian = (c.ergu.hate.qianqian || 0) + 2;
@@ -754,6 +827,7 @@ function condolenceFallout(S) {
 }
 
 const TURNS = [
+  { id: 'safe_found', if: (S) => S.flags.safeOpened, run: () => ({ whisper: '書房的保險箱被打開了，裡面空了。大伯在書房吼了一整個下午。' }) },
   { id: 'pudding_gone', if: (S) => S.flags.puddingAlone, run: () => ({}) },   // 群組訊息在 group.js
   { id: 'qiu_photo', if: (S) => S.chars.qiu.bond >= 2 && S.room === 'kitchen' && S.slot === 2 && S.chars.qiu.loc === 'kitchen', run: (S) => {
     S.flags.sawPhoto = true;
@@ -1160,5 +1234,5 @@ function nearMiss(S, ending) {
   return out.sort((a, b) => a.near - b.near).slice(0, 2).map(x => x.t);
 }
 
-return { SCENE_CHANGES, DRINK, INTERLUDES, MISHAP, SPECIALS, PREREAD, GALLERY, GALLERY_CHAR, nearMiss, SHOW_QQ, PERSUADE, GOAL_TITLE, INTRO, MOMENTS, KUI_DREAM, QUESTIONS, profile, foreshadow, goals, ARRIVE, greet, chat, hasChat, CMD_HELP, cmd, BONDS, HOTSPOTS, timeline: TIMELINE, turns: TURNS, whisperer, camera, READING_INTRO, ENDINGS, epilogues };
+return { CASES, SCENE_CHANGES, DRINK, INTERLUDES, MISHAP, SPECIALS, PREREAD, GALLERY, GALLERY_CHAR, nearMiss, SHOW_QQ, PERSUADE, GOAL_TITLE, INTRO, MOMENTS, KUI_DREAM, QUESTIONS, profile, foreshadow, goals, ARRIVE, greet, chat, hasChat, CMD_HELP, cmd, BONDS, HOTSPOTS, timeline: TIMELINE, turns: TURNS, whisperer, camera, READING_INTRO, ENDINGS, epilogues };
 })();
